@@ -1,0 +1,99 @@
+# Values for the kind-based e2e test. Not an example to copy — it is tuned for a
+# 2-core / 7 GB GitHub runner and points at the mock OIDC issuer from ci/mock-oidc.yaml.
+
+server:
+  name: ci
+  tmdbApiKey: not-a-real-key   # indexing works without TMDB; enrichment just logs and skips
+  oidc:
+    # Must match the `iss` claim the mock issuer mints — see ci/mock-oidc.yaml.
+    url: http://mock-oidc:8080/default
+
+  resources:
+    requests:
+      cpu: 100m
+      memory: 512Mi
+    limits:
+      memory: 3Gi
+
+  # Give the native image room to boot on a slow runner before liveness starts killing it.
+  probes:
+    startup:
+      failureThreshold: 60
+      periodSeconds: 5
+
+  libraries:
+    - name: shows
+      type: SHOW
+    - name: movies
+      type: MOVIE
+
+  # /testdata is mounted into the kind node by ci/kind-config.yaml.
+  mediaVolumes:
+    - name: tv
+      library: shows
+      mountPath: /media/tv
+      hostPath: /testdata/node1/disk1/tv
+    - name: movies
+      library: movies
+      mountPath: /media/movies
+      hostPath: /testdata/node1/disk1/movies
+
+website:
+  resources:
+    requests:
+      cpu: 10m
+      memory: 32Mi
+    limits:
+      memory: 128Mi
+
+cache:
+  size: 1Gi
+  retain: false
+
+ingress:
+  enabled: false
+
+database:
+  mode: internal
+  internal:
+    storageSize: 1Gi
+    retain: false
+    resources:
+      requests:
+        cpu: 50m
+        memory: 128Mi
+      limits:
+        memory: 512Mi
+
+rabbitmq:
+  enabled: true
+  persistence:
+    enabled: false
+  resources:
+    requests:
+      cpu: 50m
+      memory: 256Mi
+    limits:
+      memory: 768Mi
+
+typesense:
+  enabled: true
+  persistence:
+    enabled: false
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      memory: 512Mi
+
+flyway:
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      memory: 512Mi
+
+monitoring:
+  enabled: false

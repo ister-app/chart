@@ -1,0 +1,141 @@
+name: CI
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+  workflow_dispatch:
+  # So the server/player repos can re-run this after publishing new :main images.
+  repository_dispatch:
+    types: [images-published]
+  schedule:
+    # The chart tracks the mutable :main tags, so a green CI can go red without anyone
+    # touching this repo. Catch that on a schedule rather than on the next release.
+    - cron: "0 5 * * 1"
+
+env:
+  HELM_VERSION: v3.16.3
+
+jobs:
+  lint:
+    name: Lint and render
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: azure/setup-helm@v4
+        with:
+          version: ${{ env.HELM_VERSION }}
+
+      - run: helm dependency build
+
+      - name: Lint every profile
+        run: |
+          helm lint . -f values-dev.yaml --set server.tmdbApiKey=x
+          helm lint . -f values-production.example.yaml --set server.tmdbApiKey=x
+          helm lint . -f ci/values-ci.yaml
+
+      - name: Render every profile
+        run: |
+          # values.schema.json and the template guards do the real work here; this just
+          # makes sure each profile still produces parseable YAML.
+          helm template ister . -f values-dev.yaml --set server.tmdbApiKey=x > /dev/null
+          helm template ister . -f values-production.example.yaml --set server.tmdbApiKey=x > /dev/null
+          helm template ister . -f ci/values-ci.yaml > /dev/null
+          # All-external: no bundled datastores at all.
+          helm template ister . \
+            --set server.tmdbApiKey=x --set server.oidc.url=https://oidc.example/realms/a \
+            --set database.mode=external --set database.external.host=pg \
+            --set database.external.password=p \
+            --set rabbitmq.enabled=false --set externalRabbitmq.host=rmq \
+            --set externalRabbitmq.password=p \
+            --set typesense.enabled=false --set typesense.external.host=ts \
+            --set typesense.external.existingSecret=ts > /dev/null
+
+      - name: Validate rendered manifests against Kubernetes schemas
+        uses: docker://ghcr.io/yannh/kubeconform:latest-alpine
+        with:
+          entrypoint: /bin/sh
+          args: >-
+            -c "helm template ister . -f ci/values-ci.yaml |
+                kubeconform -strict -summary -ignore-missing-schemas"
+
+  e2e:
+    name: End-to-end on kind
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: chart
+
+      # The media fixtures are not committed (testdata/.gitignore excludes *.mkv), so
+      # they have to be generated. create_mkv.sh shells out to ffmpeg.
+      - uses: actions/checkout@v4
+        with:
+          repository: ister-app/testdata
+          path: testdata
+
+      - name: Generate media fixtures
+        run: |
+          sudo apt-get update && sudo apt-get install -y ffmpeg
+          cd testdata && ./create_mkv.sh
+          echo "--- generated:"
+          find node1/disk1/tv node1/disk1/movies -name '*.mkv' | head -5
+          find node1/disk1 -name '*.mkv' | wc -l
+
+      - uses: azure/setup-helm@v4
+        with:
+          version: ${{ env.HELM_VERSION }}
+
+      - name: Create kind cluster
+        uses: helm/kind-action@v1
+        with:
+          config: chart/ci/kind-config.yaml
+          cluster_name: ister
+
+      - name: Deploy the mock OIDC issuer
+        run: |
+          kubectl create namespace ister
+          kubectl apply -n ister -f chart/ci/mock-oidc.yaml
+          kubectl wait -n ister --for=condition=Available deploy/mock-oidc --timeout=120s
+
+      - name: Install the chart
+        working-directory: chart
+        run: |
+          helm dependency build
+          helm upgrade --install ister . -n ister -f ci/values-ci.yaml --wait --timeout 15m
+
+      - name: Wait for everything to be ready
+        run: |
+          kubectl wait -n ister --for=condition=Ready pod --all --timeout=10m
+          kubectl get pods -n ister
+
+      - name: helm test (unauthenticated smoke)
+        run: helm test ister -n ister --logs
+
+      - name: End-to-end (scan and index real media)
+        working-directory: chart
+        run: ./ci/e2e.sh ister ister
+
+      - name: Diagnostics
+        if: failure()
+        run: |
+          echo "===== pods ====="
+          kubectl get pods -n ister -o wide
+          echo "===== events ====="
+          kubectl get events -n ister --sort-by=.lastTimestamp | tail -40
+          echo "===== describe not-ready pods ====="
+          kubectl get pods -n ister -o name | while read -r p; do
+            kubectl describe -n ister "$p" | sed -n '/Events:/,$p'
+          done
+          echo "===== logs (all containers, including init) ====="
+          kubectl get pods -n ister -o name | while read -r p; do
+            echo "----- $p"
+            # --all-containers alone skips init containers, and the flyway/wait-for-db
+            # init containers are exactly where a broken install shows itself.
+            kubectl logs -n ister "$p" --all-containers --prefix --tail=100 || true
+            for c in wait-for-db flyway; do
+              kubectl logs -n ister "$p" -c "$c" --tail=50 2>/dev/null | sed "s/^/[$c] /" || true
+            done
+          done

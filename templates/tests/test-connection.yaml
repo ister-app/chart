@@ -22,13 +22,43 @@ spec:
         - -c
         - |
           set -eu
-          echo "server health:"
-          curl -fsS "http://{{ include "ister.fullname" . }}-server:{{ .Values.server.managementPort }}{{ .Values.server.probes.path }}"
+          SERVER="http://{{ include "ister.fullname" . }}-server"
+
+          # Actuator is on the management port and is NOT behind server.contextPath.
+          # Its health indicators cover the database and RabbitMQ.
+          echo "==> server health"
+          curl -fsS "$SERVER:{{ .Values.server.managementPort }}{{ .Values.server.probes.path }}"
           echo
-          echo "website:"
-          curl -fsS -o /dev/null -w '%{http_code}\n' "http://{{ include "ister.fullname" . }}-website:8080/"
+
+          # The document a client fetches first: name, OIDC issuer, API URL.
+          echo "==> /.well-known/ister"
+          curl -fsS "$SERVER:8080{{ .Values.server.contextPath }}/.well-known/ister"
+          echo
+
+          # getServerInfo is the only unauthenticated GraphQL query, and it reads the
+          # node registry from the database. A 200 here proves Postgres is up, Flyway
+          # migrated the schema, and the server registered itself on startup — which is
+          # far more than "the port is open".
+          echo "==> GraphQL getServerInfo"
+          body='{"query":"{ getServerInfo { name url openIdUrl nodes { id name } } }"}'
+          out=$(curl -fsS -X POST "$SERVER:8080{{ .Values.server.contextPath }}/graphql" \
+            -H 'Content-Type: application/json' -d "$body")
+          echo "$out"
+          # GraphQL reports failures in a 200 body, so a bare curl -f is not enough.
+          case "$out" in
+            *'"errors"'*) echo "getServerInfo returned errors"; exit 1 ;;
+            *'"name"'*) ;;
+            *) echo "unexpected getServerInfo response"; exit 1 ;;
+          esac
+
+          echo "==> website"
+          curl -fsS -o /dev/null -w 'HTTP %{http_code}\n' \
+            "http://{{ include "ister.fullname" . }}-website:8080/"
           {{- if .Values.typesense.enabled }}
-          echo "typesense health:"
+
+          echo "==> typesense health"
           curl -fsS "http://{{ include "ister.fullname" . }}-typesense:{{ .Values.typesense.port }}/health"
           echo
           {{- end }}
+
+          echo "==> all checks passed"

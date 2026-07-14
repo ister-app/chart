@@ -47,7 +47,7 @@ spec:
       serviceAccountName: {{ include "ister.serviceAccountName" . }}
       automountServiceAccountToken: false
       securityContext:
-        fsGroup: 999
+        {{- toYaml .Values.database.internal.podSecurityContext | nindent 8 }}
       containers:
         - name: postgres
           image: {{ include "ister.image" (dict "ctx" . "image" .Values.database.internal.image) | quote }}

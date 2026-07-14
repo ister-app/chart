@@ -222,6 +222,18 @@ database:
     storageClass: ""
     storageSize: 8Gi
     retain: true
+
+    # Run as the image's own postgres user (uid 999). The entrypoint chmods
+    # /var/run/postgresql and chowns PGDATA; as root with capabilities dropped those
+    # calls fail with EPERM and the container crash-loops, so it must own them instead.
+    podSecurityContext:
+      runAsNonRoot: true
+      runAsUser: 999
+      runAsGroup: 999
+      fsGroup: 999
+      seccompProfile:
+        type: RuntimeDefault
+
     resources:
       requests:
         cpu: 100m
@@ -288,6 +300,16 @@ database:
 # ============================================================
 rabbitmq:
   enabled: true
+
+  # Bitnami stopped publishing to docker.io/bitnami, so the subchart's own default image
+  # tag 404s. bitnamilegacy is the mirror of the pre-shutdown images. Overriding the
+  # repository trips the subchart's image check, hence allowInsecureImages.
+  image:
+    repository: bitnamilegacy/rabbitmq
+  global:
+    security:
+      allowInsecureImages: true
+
   # Never expose the management UI. Pinned explicitly (rather than left to the
   # subchart default) because Helm's value coalescing confuses this key with the
   # chart's own top-level `ingress` block and warns about it on every render.

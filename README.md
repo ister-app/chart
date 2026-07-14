@@ -133,3 +133,45 @@ helm lint . -f values-dev.yaml --set server.tmdbApiKey=x
 helm template ister . -f values-production.yaml | kubectl apply --dry-run=server -f -
 helm test ister -n ister
 ```
+
+## CI
+
+`.github/workflows/ci.yml` lints and renders every profile, then stands the whole stack up
+on a kind cluster and tests that it actually works. It runs on push and PR, on a weekly
+schedule (the chart tracks mutable `:main` image tags, so CI can go red without anyone
+touching this repo), and on a `repository_dispatch` of type `images-published` so the app
+repos can re-run it after publishing new images.
+
+Two levels of test:
+
+- **`helm test`** — unauthenticated, ships with the chart, so users can run it against
+  their own install. Checks actuator health, `/.well-known/ister`, the website, Typesense,
+  and the `getServerInfo` GraphQL query. That last one reads the node registry from the
+  database, so it proves Postgres is up, Flyway migrated, and the server registered itself.
+- **`ci/e2e.sh`** — the real thing: mints a JWT, calls the `scanLibrary` mutation, and
+  polls until the scanner has indexed shows and movies from the `ister-app/testdata`
+  fixtures. This needs an OIDC issuer, because `scanLibrary` and every content query are
+  `@PreAuthorize("hasRole('user')")` — hence `ci/mock-oidc.yaml`, a mock issuer minting
+  tokens with a `roles: ["user"]` claim. Indexing itself needs no TMDB key and no internet:
+  shows and movies are derived from filenames and local `.nfo` files.
+
+To run it locally (needs kind, helm, jq, ffmpeg, and a container runtime):
+
+```sh
+git clone https://github.com/ister-app/testdata ../testdata
+(cd ../testdata && ./create_mkv.sh)          # the *.mkv fixtures are gitignored
+
+cd ..                                        # ci/kind-config.yaml mounts ./testdata
+kind create cluster --name ister-ci --config chart/ci/kind-config.yaml
+cd chart
+
+kubectl create namespace ister
+kubectl apply -n ister -f ci/mock-oidc.yaml
+helm dependency build
+helm install ister . -n ister -f ci/values-ci.yaml --wait --timeout 12m
+
+helm test ister -n ister --logs
+./ci/e2e.sh ister ister
+
+kind delete cluster --name ister-ci
+```

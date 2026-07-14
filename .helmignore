@@ -12,3 +12,7 @@
 # Environment overrides are applied with -f, not packaged.
 values-dev.yaml
 values-production.yaml
+
+# CI scaffolding is not part of the chart.
+.github/
+ci/
