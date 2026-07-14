@@ -1,0 +1,121 @@
+{{- if .Values.typesense.enabled }}
+{{- $fullname := include "ister.fullname" . }}
+{{- if and .Values.typesense.persistence.enabled (not .Values.typesense.persistence.existingClaim) }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ $fullname }}-typesense
+  labels:
+    {{- include "ister.labels" (dict "ctx" . "component" "typesense") | nindent 4 }}
+  {{- if .Values.typesense.persistence.retain }}
+  annotations:
+    helm.sh/resource-policy: keep
+  {{- end }}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  {{- with .Values.typesense.persistence.storageClass }}
+  storageClassName: {{ . }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.typesense.persistence.size }}
+---
+{{- end }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $fullname }}-typesense
+  labels:
+    {{- include "ister.labels" (dict "ctx" . "component" "typesense") | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "ister.selectorLabels" (dict "ctx" . "component" "typesense") | nindent 6 }}
+  strategy:
+    # Single instance on a ReadWriteOnce volume.
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        {{- include "ister.selectorLabels" (dict "ctx" . "component" "typesense") | nindent 8 }}
+      annotations:
+        checksum/secrets: {{ include (print $.Template.BasePath "/secrets.yaml") . | sha256sum }}
+    spec:
+      serviceAccountName: {{ include "ister.serviceAccountName" . }}
+      automountServiceAccountToken: false
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.typesense.podSecurityContext | nindent 8 }}
+      {{- with .Values.typesense.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.typesense.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: typesense
+          image: {{ include "ister.image" (dict "ctx" . "image" .Values.typesense.image) | quote }}
+          imagePullPolicy: {{ .Values.typesense.image.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.typesense.securityContext | nindent 12 }}
+          args:
+            - --data-dir
+            - /data
+            - --api-key=$(TYPESENSE_API_KEY)
+            - --enable-cors
+          env:
+            - name: TYPESENSE_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "ister.typesenseSecretName" . }}
+                  key: api-key
+          ports:
+            - name: http
+              containerPort: 8108
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 20
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.typesense.resources | nindent 12 }}
+          volumeMounts:
+            - name: data
+              mountPath: /data
+      volumes:
+        - name: data
+          {{- if .Values.typesense.persistence.enabled }}
+          persistentVolumeClaim:
+            claimName: {{ default (printf "%s-typesense" $fullname) .Values.typesense.persistence.existingClaim }}
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $fullname }}-typesense
+  labels:
+    {{- include "ister.labels" (dict "ctx" . "component" "typesense") | nindent 4 }}
+spec:
+  ports:
+    - name: http
+      port: {{ .Values.typesense.port }}
+      targetPort: http
+  selector:
+    {{- include "ister.selectorLabels" (dict "ctx" . "component" "typesense") | nindent 4 }}
+{{- end }}

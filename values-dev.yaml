@@ -1,0 +1,62 @@
+# Development: everything self-contained, nothing external, no ingress.
+#
+#   helm dependency build
+#   helm install ister . -f values-dev.yaml --create-namespace -n ister \
+#     --set server.tmdbApiKey=<key>
+#
+# Passwords left empty are generated on install and preserved across upgrades.
+
+server:
+  name: Ister (dev)
+  oidc:
+    url: http://localhost:8060/realms/Ister
+  resources:
+    requests:
+      cpu: 100m
+      memory: 512Mi
+    limits:
+      memory: 2Gi
+
+  libraries:
+    - name: shows
+      type: SHOW
+    - name: movies
+      type: MOVIE
+
+  # Point these at real directories on the node before installing, or leave the list
+  # empty — the server starts fine with no libraries mounted.
+  mediaVolumes: []
+  # - name: shows
+  #   library: shows
+  #   mountPath: /mnt/shows
+  #   hostPath: /srv/testdata/shows
+  # - name: movies
+  #   library: movies
+  #   mountPath: /mnt/movies
+  #   hostPath: /srv/testdata/movies
+
+cache:
+  size: 4Gi
+  retain: false
+
+ingress:
+  enabled: false
+
+database:
+  mode: internal
+  internal:
+    storageSize: 2Gi
+    retain: false
+
+rabbitmq:
+  enabled: true
+  persistence:
+    enabled: false
+
+typesense:
+  enabled: true
+  persistence:
+    enabled: false
+
+monitoring:
+  enabled: false

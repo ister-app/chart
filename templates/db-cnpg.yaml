@@ -1,0 +1,130 @@
+{{- if eq .Values.database.mode "cnpg" }}
+{{- $fullname := include "ister.fullname" . }}
+{{- $cluster := include "ister.cnpgClusterName" . }}
+{{- $cnpg := .Values.database.cnpg }}
+{{- $backup := $cnpg.backup }}
+{{- if and $backup.enabled (not (and $backup.destinationPath $backup.endpointURL)) }}
+{{- fail "database.cnpg.backup.enabled requires both destinationPath and endpointURL" }}
+{{- end }}
+{{- if $backup.enabled }}
+# Barman Cloud backup target. Requires the barman-cloud CNPG plugin.
+apiVersion: barmancloud.cnpg.io/v1
+kind: ObjectStore
+metadata:
+  name: {{ $fullname }}-objectstore
+  labels:
+    {{- include "ister.labels" (dict "ctx" . "component" "database") | nindent 4 }}
+spec:
+  {{- with $backup.region }}
+  instanceSidecarConfiguration:
+    env:
+      - name: AWS_DEFAULT_REGION
+        value: {{ . | quote }}
+  {{- end }}
+  configuration:
+    destinationPath: {{ $backup.destinationPath | quote }}
+    endpointURL: {{ $backup.endpointURL | quote }}
+    s3Credentials:
+      accessKeyId:
+        name: {{ default (printf "%s-backup-s3" $fullname) $backup.existingSecret }}
+        key: AWS_ACCESS_KEY_ID
+      secretAccessKey:
+        name: {{ default (printf "%s-backup-s3" $fullname) $backup.existingSecret }}
+        key: AWS_SECRET_ACCESS_KEY
+    wal:
+      compression: {{ $backup.walCompression }}
+---
+{{- end }}
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: {{ $cluster }}
+  labels:
+    {{- include "ister.labels" (dict "ctx" . "component" "database") | nindent 4 }}
+spec:
+  instances: {{ $cnpg.instances }}
+  {{- with $cnpg.imageName }}
+  imageName: {{ . }}
+  {{- end }}
+
+  # CNPG creates Secret <cluster>-app with keys host/port/dbname/user/password.
+  # That is the Secret the server and the Flyway job read.
+  bootstrap:
+    initdb:
+      database: {{ $cnpg.dbName }}
+      owner: {{ $cnpg.user }}
+
+  storage:
+    size: {{ $cnpg.storageSize }}
+    {{- with $cnpg.storageClass }}
+    storageClass: {{ . }}
+    {{- end }}
+
+  {{- if $cnpg.enablePodAntiAffinity }}
+  affinity:
+    enablePodAntiAffinity: true
+    topologyKey: kubernetes.io/hostname
+    podAntiAffinityType: required
+  {{- end }}
+
+  postgresql:
+    {{- with $cnpg.parameters }}
+    parameters:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
+
+  monitoring:
+    # Deprecated in CNPG and slated for removal; the chart renders the PodMonitor below.
+    enablePodMonitor: false
+
+  {{- with $cnpg.resources }}
+  resources:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+
+  {{- if $backup.enabled }}
+  plugins:
+    - name: barman-cloud.cloudnative-pg.io
+      isWALArchiver: true
+      parameters:
+        barmanObjectName: {{ $fullname }}-objectstore
+  {{- end }}
+{{- if $cnpg.podMonitor.enabled }}
+---
+# Replaces the CNPG operator's own (deprecated) enablePodMonitor.
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: {{ $cluster }}-metrics
+  labels:
+    {{- include "ister.labels" (dict "ctx" . "component" "database") | nindent 4 }}
+    {{- with $cnpg.podMonitor.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  selector:
+    matchLabels:
+      cnpg.io/cluster: {{ $cluster }}
+  podMetricsEndpoints:
+    - port: metrics
+      interval: {{ $cnpg.podMonitor.interval }}
+{{- end }}
+{{- if and $backup.enabled $backup.schedule.enabled }}
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: ScheduledBackup
+metadata:
+  name: {{ $cluster }}-scheduled
+  labels:
+    {{- include "ister.labels" (dict "ctx" . "component" "database") | nindent 4 }}
+spec:
+  # CNPG cron has six fields: the first is seconds.
+  schedule: {{ $backup.schedule.cron | quote }}
+  backupOwnerReference: {{ $backup.schedule.backupOwnerReference }}
+  cluster:
+    name: {{ $cluster }}
+  method: plugin
+  pluginConfiguration:
+    name: barman-cloud.cloudnative-pg.io
+{{- end }}
+{{- end }}

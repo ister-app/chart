@@ -1,0 +1,66 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "ister.fullname" . }}-website
+  labels:
+    {{- include "ister.labels" (dict "ctx" . "component" "website") | nindent 4 }}
+spec:
+  replicas: {{ .Values.website.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "ister.selectorLabels" (dict "ctx" . "component" "website") | nindent 6 }}
+  strategy:
+    # Stateless: roll it without downtime.
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        {{- include "ister.selectorLabels" (dict "ctx" . "component" "website") | nindent 8 }}
+      {{- with .Values.website.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      serviceAccountName: {{ include "ister.serviceAccountName" . }}
+      automountServiceAccountToken: false
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.website.podSecurityContext | nindent 8 }}
+      {{- with .Values.website.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.website.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.website.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: website
+          image: {{ include "ister.image" (dict "ctx" . "image" .Values.website.image) | quote }}
+          imagePullPolicy: {{ .Values.website.image.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.website.securityContext | nindent 12 }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.website.port }}
+          {{- if .Values.website.probes.enabled }}
+          readinessProbe:
+            httpGet:
+              path: {{ .Values.website.probes.path }}
+              port: http
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: {{ .Values.website.probes.path }}
+              port: http
+            periodSeconds: 20
+          {{- end }}
+          resources:
+            {{- toYaml .Values.website.resources | nindent 12 }}

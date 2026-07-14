@@ -1,0 +1,21 @@
+{{- if and .Values.cache.enabled (not .Values.cache.existingClaim) }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "ister.fullname" . }}-cache
+  labels:
+    {{- include "ister.labels" (dict "ctx" . "component" "server") | nindent 4 }}
+  {{- if .Values.cache.retain }}
+  annotations:
+    helm.sh/resource-policy: keep
+  {{- end }}
+spec:
+  accessModes:
+    - {{ .Values.cache.accessMode }}
+  {{- with .Values.cache.storageClass }}
+  storageClassName: {{ . }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.cache.size }}
+{{- end }}

@@ -1,0 +1,41 @@
+{{ .Chart.Name }} {{ .Chart.Version }} (app {{ .Chart.AppVersion }}) is installed as "{{ .Release.Name }}" in namespace "{{ .Release.Namespace }}".
+
+Components:
+  server     {{ include "ister.image" (dict "ctx" . "image" .Values.server.image) }}
+  website    {{ include "ister.image" (dict "ctx" . "image" .Values.website.image) }}
+  database   {{ .Values.database.mode }}{{ if eq .Values.database.mode "cnpg" }} ({{ .Values.database.cnpg.instances }} instances, backups {{ if .Values.database.cnpg.backup.enabled }}on{{ else }}off{{ end }}){{ end }}
+  rabbitmq   {{ if .Values.rabbitmq.enabled }}bundled subchart{{ else }}external ({{ .Values.externalRabbitmq.host }}){{ end }}
+  typesense  {{ if .Values.typesense.enabled }}bundled{{ else if .Values.typesense.external.host }}external ({{ .Values.typesense.external.host }}){{ else }}disabled{{ end }}
+
+Reach it:
+{{- if .Values.ingress.enabled }}
+  {{ include "ister.serverUrl" . }}   (API)
+  {{ if .Values.ingress.tls.enabled }}https{{ else }}http{{ end }}://{{ .Values.ingress.host }}/   (web)
+{{- else }}
+  No ingress is configured. Port-forward instead:
+
+    kubectl port-forward -n {{ .Release.Namespace }} svc/{{ include "ister.fullname" . }}-website 8080:8080
+
+  then open http://localhost:8080
+{{- end }}
+
+Check it:
+  helm test {{ .Release.Name }} -n {{ .Release.Namespace }}
+  kubectl logs -n {{ .Release.Namespace }} deploy/{{ include "ister.fullname" . }}-server -c flyway
+{{- if not .Values.server.existingSecret }}
+
+WARNING: the TMDB API key came from server.tmdbApiKey. Passing secrets with --set leaves
+them in your shell history; prefer creating the Secret yourself and pointing
+server.existingSecret at it (key: tmdb-api-key).
+{{- end }}
+{{- if and .Values.ingress.enabled .Values.ingress.wellKnown.enabled }}
+
+NOTE: ingress.wellKnown renders an ingress-nginx server-snippet. Modern ingress-nginx
+ships with allow-snippet-annotations=false and silently drops it, in which case
+/.well-known/ister will 404 until you enable that flag in the ingress-nginx ConfigMap.
+{{- end }}
+{{- if eq .Values.database.mode "internal" }}
+
+NOTE: database.mode=internal is one PostgreSQL pod, no backups, no failover. Use
+mode=cnpg (CloudNativePG operator) or mode=external for anything you care about.
+{{- end }}

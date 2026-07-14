@@ -1,0 +1,14 @@
+.DS_Store
+.git/
+.gitignore
+.idea/
+.vscode/
+.claude/
+*.swp
+*.bak
+*.tmp
+*.orig
+*~
+# Environment overrides are applied with -f, not packaged.
+values-dev.yaml
+values-production.yaml

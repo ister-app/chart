@@ -1,0 +1,402 @@
+# Default values for the ister chart.
+#
+# These defaults are deliberately neutral: they deploy a self-contained ister
+# (embedded PostgreSQL, RabbitMQ subchart, Typesense) with no ingress and no
+# media volumes. See values-dev.yaml and values-production.yaml for real setups.
+#
+# Nothing in this file is a secret. Provide secrets with an existingSecret
+# reference, or via a secret manager — never by committing them here.
+
+nameOverride: ""
+fullnameOverride: ""
+
+# Applied to every pod. The website image (Forgejo) may need one.
+imagePullSecrets: []
+
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {}
+
+# ============================================================
+# Server (Spring Boot backend)
+# ============================================================
+server:
+  # Display name of this instance. Also the first line of /.well-known/ister.
+  name: Ister
+
+  image:
+    repository: ghcr.io/ister-app/server
+    # Defaults to .Chart.AppVersion. Set a digest for a reproducible rollback.
+    tag: ""
+    digest: ""
+    pullPolicy: IfNotPresent
+
+  # The cache volume is ReadWriteOnce, so >1 replica cannot schedule.
+  # The chart fails the render if you raise this without switching to RWX.
+  replicaCount: 1
+
+  contextPath: /api
+
+  # Public base URL of the API. Empty = derived from the ingress host + contextPath.
+  url: ""
+
+  oidc:
+    # OIDC issuer, e.g. https://keycloak.example.com/realms/auth
+    url: ""
+
+  # TMDB API key. Rendered into a Secret, not into the pod spec.
+  # Prefer existingSecret (key: tmdb-api-key) over putting the key in values.
+  tmdbApiKey: ""
+  existingSecret: ""
+
+  managementPort: 8081
+
+  # Spring's ${TYPESENSE_PORT:8108} placeholder collides with the Docker-style
+  # service-link env var Kubernetes injects for the typesense Service.
+  # Keep this false or the server will fail to start once Typesense exists.
+  enableServiceLinks: false
+
+  # Extra env vars, e.g. HLS_HWACCEL, ISTER_LANGUAGES, CACHE_CLEANUP_CRON.
+  extraEnv: []
+
+  podAnnotations: {}
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      memory: 4Gi
+
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    fsGroup: 1000
+    seccompProfile:
+      type: RuntimeDefault
+
+  securityContext:
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop: [ALL]
+
+  # Actuator lives on managementPort, outside the /api context path.
+  # /actuator/health is always exposed; the liveness/readiness sub-groups are only
+  # present when Spring detects Kubernetes, so they are not the default here.
+  probes:
+    enabled: true
+    path: /actuator/health
+    startup:
+      failureThreshold: 30
+      periodSeconds: 10
+    liveness:
+      periodSeconds: 20
+      failureThreshold: 3
+    readiness:
+      periodSeconds: 10
+      failureThreshold: 3
+
+  # Scratch space for transcoding. mountPath always sets TMP_DIR.
+  tmp:
+    mountPath: /tmp/ister
+    # Back mountPath with a dedicated volume. Set false when mountPath already falls
+    # inside one of the mediaVolumes below — otherwise this volume is mounted *over*
+    # that path and shadows it, and transcodes silently land on the node's disk.
+    enabled: true
+    sizeLimit: 10Gi
+    # An emptyDir is used unless an existingClaim is given.
+    existingClaim: ""
+
+  # Media libraries. Each maps to APP_ISTER_DISK_LIBRARIES_<i>_*.
+  # type: SHOW | MOVIE | MUSIC | BOOK | PODCAST
+  libraries: []
+  # - name: shows
+  #   type: SHOW
+
+  # Media volumes. Each entry is mounted into the server AND registered as
+  # APP_ISTER_DISK_DIRECTORIES_<i>_*, unless library is omitted (mount only).
+  # Exactly one source per entry: hostPath | existingClaim | nfs.
+  # NOTE: no trailing slash on mountPath — the scanner skips the tree if there is one.
+  mediaVolumes: []
+  # - name: shows
+  #   library: shows
+  #   mountPath: /mnt/shows
+  #   hostPath: /srv/media/shows
+  #   hostPathType: Directory
+  # - name: music
+  #   library: music
+  #   mountPath: /mnt/music
+  #   existingClaim: media-music
+
+# ============================================================
+# Website (frontend)
+# ============================================================
+website:
+  image:
+    repository: ghcr.io/ister-app/player
+    tag: ""
+    digest: ""
+    pullPolicy: IfNotPresent
+  replicaCount: 1
+  port: 8080
+  podAnnotations: {}
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+  resources:
+    requests:
+      cpu: 10m
+      memory: 32Mi
+    limits:
+      memory: 128Mi
+  podSecurityContext:
+    runAsNonRoot: true
+    seccompProfile:
+      type: RuntimeDefault
+  securityContext:
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop: [ALL]
+  probes:
+    enabled: true
+    path: /
+
+# ============================================================
+# Cache PVC (server CACHE_DIR)
+# ============================================================
+cache:
+  enabled: true
+  # Use a pre-existing PVC instead of creating one.
+  existingClaim: ""
+  mountPath: /cache
+  storageClass: ""
+  size: 20Gi
+  accessMode: ReadWriteOnce
+  # Survive `helm uninstall`. Set false if you want the cache purged with the release.
+  retain: true
+
+# ============================================================
+# Ingress
+# ============================================================
+ingress:
+  enabled: false
+  className: nginx
+  host: ""
+  annotations: {}
+  tls:
+    enabled: true
+    # Empty = "<host with dots replaced by dashes>-tls"
+    secretName: ""
+    # cert-manager ClusterIssuer. Empty = no cert-manager annotation.
+    certIssuer: ""
+  # Serve /.well-known/ister so clients can discover the API and OIDC endpoints.
+  # Implemented as an ingress-nginx server-snippet, which is DISABLED BY DEFAULT in
+  # modern ingress-nginx (allow-snippet-annotations=false). Enable it there first.
+  wellKnown:
+    enabled: false
+
+# ============================================================
+# Database
+#   internal — a single postgres Deployment + PVC. Dev only, no backups.
+#   cnpg     — a CloudNativePG Cluster. Requires the CNPG operator.
+#   external — an existing PostgreSQL.
+# All three end up behind one Secret with keys: host, port, dbname, user, password.
+# ============================================================
+database:
+  mode: internal
+
+  internal:
+    image:
+      repository: postgres
+      tag: "18"
+      pullPolicy: IfNotPresent
+    dbName: ister
+    user: ister
+    # Provide via existingSecret in anything but a throwaway cluster.
+    password: ""
+    existingSecret: ""
+    storageClass: ""
+    storageSize: 8Gi
+    retain: true
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        memory: 1Gi
+
+  cnpg:
+    instances: 3
+    imageName: ""
+    dbName: ister
+    user: ister
+    storageClass: ""
+    storageSize: 12Gi
+    # Spread instances across nodes.
+    enablePodAntiAffinity: true
+
+    # Scrape the CNPG instances. The chart renders the PodMonitor itself; the operator's
+    # own spec.monitoring.enablePodMonitor is deprecated and slated for removal.
+    podMonitor:
+      enabled: true
+      interval: 30s
+      # Extra labels so your Prometheus instance selects it.
+      labels: {}
+    parameters:
+      pgaudit.log: "all, -misc"
+      pgaudit.log_parameter: "on"
+      pgaudit.log_relation: "on"
+    resources: {}
+
+    # Barman Cloud backups to S3-compatible storage.
+    # Requires the barman-cloud CNPG plugin.
+    backup:
+      enabled: false
+      destinationPath: ""       # e.g. s3://postgres-bucket/
+      endpointURL: ""           # e.g. http://garage.example.com:3900
+      region: ""
+      walCompression: gzip
+      # S3 credentials. Prefer existingSecret with keys:
+      #   AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY
+      existingSecret: ""
+      accessKeyId: ""
+      secretAccessKey: ""
+      schedule:
+        enabled: true
+        # Six fields — CNPG cron includes seconds.
+        cron: "0 0 3 * * *"
+        backupOwnerReference: self
+
+  external:
+    host: ""
+    port: 5432
+    dbName: ister
+    user: ister
+    password: ""
+    # Pre-existing Secret with keys: host, port, dbname, user, password.
+    # For a CNPG cluster managed outside this chart, that is its <cluster>-app Secret.
+    existingSecret: ""
+
+# ============================================================
+# RabbitMQ — Bitnami subchart (see Chart.yaml dependencies).
+# Values below are passed straight to that chart.
+# Set enabled: false to use externalRabbitmq instead.
+# ============================================================
+rabbitmq:
+  enabled: true
+  # Never expose the management UI. Pinned explicitly (rather than left to the
+  # subchart default) because Helm's value coalescing confuses this key with the
+  # chart's own top-level `ingress` block and warns about it on every render.
+  ingress:
+    enabled: false
+    tls: false
+  auth:
+    username: user
+    # Leave empty and set existingPasswordSecret, or the subchart generates one.
+    password: ""
+    existingPasswordSecret: ""
+    existingErlangSecret: ""
+  persistence:
+    enabled: true
+    size: 8Gi
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      memory: 1Gi
+
+externalRabbitmq:
+  host: ""
+  port: 5672
+  user: user
+  password: ""
+  # Pre-existing Secret with key: rabbitmq-password
+  existingSecret: ""
+
+# ============================================================
+# Typesense (search)
+# ============================================================
+typesense:
+  enabled: true
+  image:
+    repository: docker.io/typesense/typesense
+    tag: "29.0"
+    pullPolicy: IfNotPresent
+  port: 8108
+  collection: media
+  # Provide via existingSecret (key: api-key) outside of dev.
+  apiKey: ""
+  existingSecret: ""
+  persistence:
+    enabled: true
+    existingClaim: ""
+    storageClass: ""
+    size: 8Gi
+    retain: true
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    fsGroup: 1000
+    seccompProfile:
+      type: RuntimeDefault
+  securityContext:
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop: [ALL]
+  nodeSelector: {}
+  tolerations: []
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      memory: 1Gi
+
+  # Used only when enabled: false.
+  external:
+    host: ""
+    protocol: http
+    existingSecret: ""
+
+# ============================================================
+# Flyway migrations — an init container on the server pod, so the server can never
+# start against an unmigrated schema. (A Helm pre-install hook cannot work here: in
+# internal/cnpg mode the database is created by this same release, so the hook would
+# wait for a database Helm has not created yet.)
+# ============================================================
+flyway:
+  enabled: true
+  image:
+    repository: ghcr.io/ister-app/migrations
+    tag: ""
+    digest: ""
+    pullPolicy: IfNotPresent
+  # Image for the wait-for-db init container; needs pg_isready.
+  waitImage: postgres:18-alpine
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      memory: 512Mi
+
+# ============================================================
+# Monitoring — Prometheus Operator ServiceMonitor
+# ============================================================
+monitoring:
+  enabled: false
+  # Extra labels so your Prometheus instance selects this ServiceMonitor.
+  serviceMonitorLabels: {}
+  interval: 30s
+
+# ============================================================
+# PodDisruptionBudgets
+# ============================================================
+podDisruptionBudget:
+  enabled: false
+  minAvailable: 1

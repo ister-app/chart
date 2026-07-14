@@ -1,0 +1,56 @@
+{{- if .Values.ingress.enabled }}
+{{- $fullname := include "ister.fullname" . }}
+{{- $host := required "ingress.host is required when ingress.enabled is true" .Values.ingress.host }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ $fullname }}
+  labels:
+    {{- include "ister.labels" (dict "ctx" .) | nindent 4 }}
+  annotations:
+    {{- if and .Values.ingress.tls.enabled .Values.ingress.tls.certIssuer }}
+    cert-manager.io/cluster-issuer: {{ .Values.ingress.tls.certIssuer | quote }}
+    {{- end }}
+    {{- if .Values.ingress.wellKnown.enabled }}
+    {{- /* Client discovery document. Built from the same values as OIDC_URL and
+           APP_ISTER_SERVER_URL, so the three cannot drift apart.
+           Requires allow-snippet-annotations=true in the ingress-nginx config. */}}
+    nginx.ingress.kubernetes.io/server-snippet: |
+      location /.well-known/ister {
+        default_type text/plain;
+        return 200 "{{ .Values.server.name }}\n{{ .Values.server.oidc.url }}/.well-known/openid-configuration\n{{ include "ister.serverUrl" . }}";
+      }
+    {{- end }}
+    {{- with .Values.ingress.annotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  {{- with .Values.ingress.className }}
+  ingressClassName: {{ . }}
+  {{- end }}
+  {{- if .Values.ingress.tls.enabled }}
+  tls:
+    - secretName: {{ default (printf "%s-tls" (replace "." "-" $host)) .Values.ingress.tls.secretName }}
+      hosts:
+        - {{ $host | quote }}
+  {{- end }}
+  rules:
+    - host: {{ $host | quote }}
+      http:
+        paths:
+          # Most specific first: /api must not be swallowed by the website's /.
+          - path: {{ .Values.server.contextPath }}
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ $fullname }}-server
+                port:
+                  name: http
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ $fullname }}-website
+                port:
+                  name: http
+{{- end }}

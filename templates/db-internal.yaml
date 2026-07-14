@@ -1,0 +1,115 @@
+{{- if eq .Values.database.mode "internal" }}
+{{- $fullname := include "ister.fullname" . }}
+{{- $secret := include "ister.databaseSecretName" . }}
+# A single-replica PostgreSQL with no backups and no failover.
+# Fine for development; use database.mode=cnpg or external for anything real.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ $fullname }}-database
+  labels:
+    {{- include "ister.labels" (dict "ctx" . "component" "database") | nindent 4 }}
+  {{- if .Values.database.internal.retain }}
+  annotations:
+    # Do not let `helm uninstall` delete the database.
+    helm.sh/resource-policy: keep
+  {{- end }}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  {{- with .Values.database.internal.storageClass }}
+  storageClassName: {{ . }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.database.internal.storageSize }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $fullname }}-database
+  labels:
+    {{- include "ister.labels" (dict "ctx" . "component" "database") | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "ister.selectorLabels" (dict "ctx" . "component" "database") | nindent 6 }}
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        {{- include "ister.selectorLabels" (dict "ctx" . "component" "database") | nindent 8 }}
+      annotations:
+        checksum/secrets: {{ include (print $.Template.BasePath "/secrets.yaml") . | sha256sum }}
+    spec:
+      serviceAccountName: {{ include "ister.serviceAccountName" . }}
+      automountServiceAccountToken: false
+      securityContext:
+        fsGroup: 999
+      containers:
+        - name: postgres
+          image: {{ include "ister.image" (dict "ctx" . "image" .Values.database.internal.image) | quote }}
+          imagePullPolicy: {{ .Values.database.internal.image.pullPolicy }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+          ports:
+            - name: postgres
+              containerPort: 5432
+          env:
+            - name: POSTGRES_DB
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $secret }}
+                  key: dbname
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $secret }}
+                  key: user
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $secret }}
+                  key: password
+            # The image initialises PGDATA; keep it in a subdirectory so the volume
+            # root (which may contain lost+found) does not trip up initdb.
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+          livenessProbe:
+            exec:
+              command: [pg_isready, -U, {{ .Values.database.internal.user | quote }}]
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          readinessProbe:
+            exec:
+              command: [pg_isready, -U, {{ .Values.database.internal.user | quote }}]
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          resources:
+            {{- toYaml .Values.database.internal.resources | nindent 12 }}
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: {{ default (printf "%s-database" $fullname) .Values.database.internal.existingClaim }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $fullname }}-database
+  labels:
+    {{- include "ister.labels" (dict "ctx" . "component" "database") | nindent 4 }}
+spec:
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: postgres
+  selector:
+    {{- include "ister.selectorLabels" (dict "ctx" . "component" "database") | nindent 4 }}
+{{- end }}

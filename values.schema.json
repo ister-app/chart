@@ -1,0 +1,186 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "title": "ister chart values",
+  "type": "object",
+  "properties": {
+    "serviceAccount": {
+      "type": "object",
+      "properties": {
+        "create": { "type": "boolean" },
+        "name": { "type": "string" }
+      }
+    },
+    "server": {
+      "type": "object",
+      "required": ["image", "contextPath", "oidc"],
+      "properties": {
+        "name": { "type": "string" },
+        "image": { "$ref": "#/definitions/image" },
+        "replicaCount": { "type": "integer", "minimum": 1 },
+        "contextPath": { "type": "string", "pattern": "^/" },
+        "url": { "type": "string" },
+        "oidc": {
+          "type": "object",
+          "properties": { "url": { "type": "string" } }
+        },
+        "tmdbApiKey": { "type": "string" },
+        "existingSecret": { "type": "string" },
+        "managementPort": { "type": "integer" },
+        "enableServiceLinks": { "type": "boolean" },
+        "libraries": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name", "type"],
+            "properties": {
+              "name": { "type": "string" },
+              "type": {
+                "type": "string",
+                "enum": ["SHOW", "MOVIE", "MUSIC", "BOOK", "PODCAST"]
+              }
+            }
+          }
+        },
+        "mediaVolumes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name", "mountPath"],
+            "properties": {
+              "name": { "type": "string" },
+              "mountPath": { "type": "string", "pattern": "^/" },
+              "library": { "type": "string" },
+              "readOnly": { "type": "boolean" },
+              "hostPath": { "type": "string" },
+              "hostPathType": { "type": "string" },
+              "existingClaim": { "type": "string" },
+              "nfs": { "type": "object" }
+            },
+            "anyOf": [
+              { "required": ["hostPath"] },
+              { "required": ["existingClaim"] },
+              { "required": ["nfs"] }
+            ]
+          }
+        }
+      }
+    },
+    "website": {
+      "type": "object",
+      "properties": {
+        "image": { "$ref": "#/definitions/image" },
+        "replicaCount": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "cache": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "accessMode": {
+          "type": "string",
+          "enum": ["ReadWriteOnce", "ReadWriteMany"]
+        },
+        "mountPath": { "type": "string", "pattern": "^/" }
+      }
+    },
+    "ingress": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "host": { "type": "string" },
+        "tls": {
+          "type": "object",
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "secretName": { "type": "string" },
+            "certIssuer": { "type": "string" }
+          }
+        }
+      }
+    },
+    "database": {
+      "type": "object",
+      "required": ["mode"],
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": ["internal", "cnpg", "external"]
+        },
+        "cnpg": {
+          "type": "object",
+          "properties": {
+            "instances": { "type": "integer", "minimum": 1 },
+            "backup": {
+              "type": "object",
+              "properties": {
+                "enabled": { "type": "boolean" },
+                "destinationPath": { "type": "string" },
+                "endpointURL": { "type": "string" },
+                "walCompression": {
+                  "type": "string",
+                  "enum": ["gzip", "bzip2", "snappy"]
+                }
+              }
+            }
+          }
+        },
+        "external": {
+          "type": "object",
+          "properties": {
+            "host": { "type": "string" },
+            "port": { "type": "integer" },
+            "existingSecret": { "type": "string" }
+          }
+        }
+      }
+    },
+    "rabbitmq": {
+      "type": "object",
+      "properties": { "enabled": { "type": "boolean" } }
+    },
+    "externalRabbitmq": {
+      "type": "object",
+      "properties": {
+        "host": { "type": "string" },
+        "port": { "type": "integer" },
+        "user": { "type": "string" },
+        "existingSecret": { "type": "string" }
+      }
+    },
+    "typesense": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "image": { "$ref": "#/definitions/image" },
+        "port": { "type": "integer" }
+      }
+    },
+    "flyway": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "image": { "$ref": "#/definitions/image" },
+        "waitImage": { "type": "string" }
+      }
+    },
+    "monitoring": {
+      "type": "object",
+      "properties": { "enabled": { "type": "boolean" } }
+    }
+  },
+  "definitions": {
+    "image": {
+      "type": "object",
+      "required": ["repository"],
+      "properties": {
+        "repository": { "type": "string", "minLength": 1 },
+        "tag": { "type": "string" },
+        "digest": { "type": "string" },
+        "pullPolicy": {
+          "type": "string",
+          "enum": ["Always", "IfNotPresent", "Never"]
+        }
+      }
+    }
+  }
+}

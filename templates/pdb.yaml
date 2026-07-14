@@ -1,0 +1,15 @@
+{{- if .Values.podDisruptionBudget.enabled }}
+{{- /* The server is a single Recreate-strategy pod on an RWO volume; a PDB there would
+       only block node drains. Only the (stateless, scalable) website gets one. */}}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "ister.fullname" . }}-website
+  labels:
+    {{- include "ister.labels" (dict "ctx" . "component" "website") | nindent 4 }}
+spec:
+  minAvailable: {{ .Values.podDisruptionBudget.minAvailable }}
+  selector:
+    matchLabels:
+      {{- include "ister.selectorLabels" (dict "ctx" . "component" "website") | nindent 6 }}
+{{- end }}

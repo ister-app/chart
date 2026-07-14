@@ -1,0 +1,29 @@
+apiVersion: v2
+name: ister
+description: Ister media server — Spring Boot backend + web frontend, with PostgreSQL, RabbitMQ and Typesense
+type: application
+kubeVersion: ">=1.25.0-0"
+
+# Chart version. Bump on every chart change (semver).
+version: 0.2.0
+
+# Version of the ister application this chart deploys by default.
+# Used as the default image tag for server/website/migrations.
+appVersion: "main"
+
+home: https://github.com/ister-app
+sources:
+  - https://github.com/ister-app/server
+  - https://github.com/ister-app/website
+keywords:
+  - media
+  - media-server
+  - streaming
+
+dependencies:
+  # Bitnami RabbitMQ. Enabled by default; set rabbitmq.enabled=false and fill in
+  # externalRabbitmq.* to point at an existing broker instead.
+  - name: rabbitmq
+    version: "16.0.14"
+    repository: oci://registry-1.docker.io/bitnamicharts
+    condition: rabbitmq.enabled

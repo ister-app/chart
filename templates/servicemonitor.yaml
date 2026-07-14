@@ -1,0 +1,20 @@
+{{- if .Values.monitoring.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ include "ister.fullname" . }}
+  labels:
+    {{- include "ister.labels" (dict "ctx" . "component" "server") | nindent 4 }}
+    {{- with .Values.monitoring.serviceMonitorLabels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "ister.selectorLabels" (dict "ctx" . "component" "server") | nindent 6 }}
+  endpoints:
+    # Actuator listens on the management port and is NOT behind server.contextPath.
+    - port: monitor
+      path: /actuator/prometheus
+      interval: {{ .Values.monitoring.interval }}
+{{- end }}

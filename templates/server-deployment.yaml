@@ -1,0 +1,296 @@
+{{- if and (gt (int .Values.server.replicaCount) 1) (eq .Values.cache.accessMode "ReadWriteOnce") (not .Values.cache.existingClaim) }}
+{{- fail "server.replicaCount > 1 requires cache.accessMode=ReadWriteMany (the cache PVC cannot be mounted by pods on different nodes)" }}
+{{- end }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "ister.fullname" . }}-server
+  labels:
+    {{- include "ister.labels" (dict "ctx" . "component" "server") | nindent 4 }}
+spec:
+  replicas: {{ .Values.server.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "ister.selectorLabels" (dict "ctx" . "component" "server") | nindent 6 }}
+  strategy:
+    # The cache PVC is ReadWriteOnce, so an old and a new pod cannot coexist.
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        {{- include "ister.selectorLabels" (dict "ctx" . "component" "server") | nindent 8 }}
+      annotations:
+        # Roll the pods when any referenced credential changes.
+        checksum/secrets: {{ include (print $.Template.BasePath "/secrets.yaml") . | sha256sum }}
+        {{- with .Values.server.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      serviceAccountName: {{ include "ister.serviceAccountName" . }}
+      automountServiceAccountToken: false
+      # Kubernetes injects Docker-style link vars (e.g. TYPESENSE_PORT=tcp://10.x.x.x:8108)
+      # for every Service in the namespace, which shadows Spring's ${TYPESENSE_PORT:8108}.
+      enableServiceLinks: {{ .Values.server.enableServiceLinks }}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.server.podSecurityContext | nindent 8 }}
+      {{- with .Values.server.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.server.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.server.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      initContainers:
+        # Wait for the database, then migrate, then start. As init containers rather than
+        # a Helm pre-install hook: in internal/cnpg mode the database is created by this
+        # same release, so a pre-install hook would wait for a database that Helm has not
+        # created yet. Init containers get the ordering right in every database mode.
+        - name: wait-for-db
+          image: {{ .Values.flyway.waitImage | quote }}
+          securityContext:
+            {{- toYaml .Values.server.securityContext | nindent 12 }}
+          command:
+            - sh
+            - -c
+            - |
+              until pg_isready -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER"; do
+                echo "waiting for database at $DB_HOST:$DB_PORT..."
+                sleep 3
+              done
+          env:
+            - name: DB_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "ister.databaseSecretName" . }}
+                  key: host
+            - name: DB_PORT
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "ister.databaseSecretName" . }}
+                  key: port
+            - name: DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "ister.databaseSecretName" . }}
+                  key: user
+          resources:
+            {{- toYaml .Values.flyway.resources | nindent 12 }}
+        {{- if .Values.flyway.enabled }}
+        - name: flyway
+          image: {{ include "ister.image" (dict "ctx" . "image" .Values.flyway.image) | quote }}
+          imagePullPolicy: {{ .Values.flyway.image.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.server.securityContext | nindent 12 }}
+          # Credentials via FLYWAY_* env vars, never argv: CLI args are visible in the
+          # pod spec and in `ps` inside the container.
+          args:
+            - -locations=filesystem:/flyway/migrations
+            - migrate
+          env:
+            - name: DB_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "ister.databaseSecretName" . }}
+                  key: host
+            - name: DB_PORT
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "ister.databaseSecretName" . }}
+                  key: port
+            - name: DB_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "ister.databaseSecretName" . }}
+                  key: dbname
+            - name: FLYWAY_URL
+              value: "jdbc:postgresql://$(DB_HOST):$(DB_PORT)/$(DB_NAME)"
+            - name: FLYWAY_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "ister.databaseSecretName" . }}
+                  key: user
+            - name: FLYWAY_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "ister.databaseSecretName" . }}
+                  key: password
+          resources:
+            {{- toYaml .Values.flyway.resources | nindent 12 }}
+        {{- end }}
+      containers:
+        - name: server
+          image: {{ include "ister.image" (dict "ctx" . "image" .Values.server.image) | quote }}
+          imagePullPolicy: {{ .Values.server.image.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.server.securityContext | nindent 12 }}
+          ports:
+            - name: http
+              containerPort: 8080
+            - name: monitor
+              containerPort: {{ .Values.server.managementPort }}
+          env:
+            # --- Database. Note DB_PATH, not DB_PORT: that is what core.properties
+            # --- interpolates into the JDBC URL. Flyway reads DB_PORT instead.
+            - name: DB_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "ister.databaseSecretName" . }}
+                  key: host
+            - name: DB_PATH
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "ister.databaseSecretName" . }}
+                  key: port
+            - name: DB_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "ister.databaseSecretName" . }}
+                  key: dbname
+            - name: DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "ister.databaseSecretName" . }}
+                  key: user
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "ister.databaseSecretName" . }}
+                  key: password
+            # --- Application
+            - name: SERVER_SERVLET_CONTEXT_PATH
+              value: {{ .Values.server.contextPath | quote }}
+            - name: APP_ISTER_SERVER_NAME
+              value: {{ .Values.server.name | quote }}
+            - name: APP_ISTER_SERVER_URL
+              value: {{ include "ister.serverUrl" . | quote }}
+            - name: OIDC_URL
+              value: {{ required "server.oidc.url is required" .Values.server.oidc.url | quote }}
+            - name: APP_ISTER_SERVER_TMDB_APIKEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "ister.serverSecretName" . }}
+                  key: tmdb-api-key
+            - name: CACHE_DIR
+              value: {{ .Values.cache.mountPath | quote }}
+            - name: TMP_DIR
+              value: {{ .Values.server.tmp.mountPath | quote }}
+            # --- Media libraries and directories (bound by @ConfigurationProperties("app.ister.disk"))
+            {{- range $i, $lib := .Values.server.libraries }}
+            - name: APP_ISTER_DISK_LIBRARIES_{{ $i }}_NAME
+              value: {{ $lib.name | quote }}
+            - name: APP_ISTER_DISK_LIBRARIES_{{ $i }}_TYPE
+              value: {{ $lib.type | quote }}
+            {{- end }}
+            {{- $dirIndex := 0 }}
+            {{- range $vol := .Values.server.mediaVolumes }}
+            {{- if $vol.library }}
+            - name: APP_ISTER_DISK_DIRECTORIES_{{ $dirIndex }}_NAME
+              value: {{ $vol.name | quote }}
+            - name: APP_ISTER_DISK_DIRECTORIES_{{ $dirIndex }}_PATH
+              value: {{ trimSuffix "/" $vol.mountPath | quote }}
+            - name: APP_ISTER_DISK_DIRECTORIES_{{ $dirIndex }}_LIBRARY
+              value: {{ $vol.library | quote }}
+            {{- $dirIndex = add1 $dirIndex }}
+            {{- end }}
+            {{- end }}
+            # --- RabbitMQ
+            - name: SPRING_RABBITMQ_HOST
+              value: {{ include "ister.rabbitmqHost" . | quote }}
+            - name: SPRING_RABBITMQ_USERNAME
+              value: {{ include "ister.rabbitmqUser" . | quote }}
+            - name: SPRING_RABBITMQ_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "ister.rabbitmqSecretName" . }}
+                  key: {{ include "ister.rabbitmqSecretKey" . }}
+            # --- Typesense
+            {{- if or .Values.typesense.enabled .Values.typesense.external.host }}
+            - name: TYPESENSE_ENABLED
+              value: "true"
+            - name: TYPESENSE_HOST
+              value: {{ include "ister.typesenseHost" . | quote }}
+            - name: TYPESENSE_PORT
+              value: {{ .Values.typesense.port | quote }}
+            - name: TYPESENSE_PROTOCOL
+              value: {{ ternary "http" .Values.typesense.external.protocol .Values.typesense.enabled | quote }}
+            - name: TYPESENSE_COLLECTION
+              value: {{ .Values.typesense.collection | quote }}
+            - name: TYPESENSE_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "ister.typesenseSecretName" . }}
+                  key: api-key
+            {{- else }}
+            - name: TYPESENSE_ENABLED
+              value: "false"
+            {{- end }}
+            {{- with .Values.server.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          {{- if .Values.server.probes.enabled }}
+          startupProbe:
+            httpGet:
+              path: {{ .Values.server.probes.path }}
+              port: monitor
+            failureThreshold: {{ .Values.server.probes.startup.failureThreshold }}
+            periodSeconds: {{ .Values.server.probes.startup.periodSeconds }}
+          livenessProbe:
+            httpGet:
+              path: {{ .Values.server.probes.path }}
+              port: monitor
+            periodSeconds: {{ .Values.server.probes.liveness.periodSeconds }}
+            failureThreshold: {{ .Values.server.probes.liveness.failureThreshold }}
+          readinessProbe:
+            httpGet:
+              path: {{ .Values.server.probes.path }}
+              port: monitor
+            periodSeconds: {{ .Values.server.probes.readiness.periodSeconds }}
+            failureThreshold: {{ .Values.server.probes.readiness.failureThreshold }}
+          {{- end }}
+          resources:
+            {{- toYaml .Values.server.resources | nindent 12 }}
+          volumeMounts:
+            {{- if .Values.cache.enabled }}
+            - name: cache
+              mountPath: {{ .Values.cache.mountPath }}
+            {{- end }}
+            {{- if .Values.server.tmp.enabled }}
+            - name: tmp
+              mountPath: {{ .Values.server.tmp.mountPath }}
+            {{- end }}
+            {{- range .Values.server.mediaVolumes }}
+            - name: media-{{ .name }}
+              mountPath: {{ trimSuffix "/" .mountPath }}
+              {{- if .readOnly }}
+              readOnly: true
+              {{- end }}
+            {{- end }}
+      volumes:
+        {{- if .Values.cache.enabled }}
+        - name: cache
+          persistentVolumeClaim:
+            claimName: {{ default (printf "%s-cache" (include "ister.fullname" .)) .Values.cache.existingClaim }}
+        {{- end }}
+        {{- if .Values.server.tmp.enabled }}
+        - name: tmp
+          {{- if .Values.server.tmp.existingClaim }}
+          persistentVolumeClaim:
+            claimName: {{ .Values.server.tmp.existingClaim }}
+          {{- else }}
+          emptyDir:
+            sizeLimit: {{ .Values.server.tmp.sizeLimit }}
+          {{- end }}
+        {{- end }}
+        {{- range .Values.server.mediaVolumes }}
+        - name: media-{{ .name }}
+          {{- include "ister.mediaVolumeSource" . | nindent 10 }}
+        {{- end }}

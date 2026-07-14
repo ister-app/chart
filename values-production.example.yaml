@@ -1,0 +1,151 @@
+# Production example. Copy to values-production.yaml and fill in the placeholders:
+#
+#   cp values-production.example.yaml values-production.yaml
+#   helm dependency build
+#   helm upgrade --install ister . -f values-production.yaml -n ister --create-namespace
+#
+# values-production.yaml is gitignored — keep your real hostnames, node names and paths
+# out of the repository.
+#
+# This example assumes the full stack: CloudNativePG for the database (with backups to
+# S3-compatible storage), the bundled RabbitMQ and Typesense, and media on local disks.
+# Drop whichever parts you do not need; see README.md for the other profiles.
+
+# --- Secrets -----------------------------------------------------------------
+# Create these once, out of band. Never put the values in this file.
+#
+#   kubectl create secret generic ister-tmdb   -n ister --from-literal=tmdb-api-key=...
+#   kubectl create secret generic ister-search -n ister --from-literal=api-key=...
+#   kubectl create secret generic ister-rabbitmq-auth -n ister \
+#     --from-literal=rabbitmq-password=... --from-literal=rabbitmq-erlang-cookie=...
+#   kubectl create secret generic ister-backup-s3 -n ister \
+#     --from-literal=AWS_ACCESS_KEY_ID=... --from-literal=AWS_SECRET_ACCESS_KEY=...
+
+server:
+  # Shown to clients, and the first line of /.well-known/ister.
+  name: Ister
+
+  existingSecret: ister-tmdb
+
+  oidc:
+    # Your OIDC issuer, e.g. Keycloak.
+    url: https://auth.example.com/realms/ister
+
+  # Media below is on local disks, which pins the server to that one machine.
+  # Remove this (and use existingClaim/nfs volumes) to keep it schedulable anywhere.
+  nodeSelector:
+    kubernetes.io/hostname: CHANGEME-node
+
+  resources:
+    requests:
+      cpu: 500m
+      memory: 2Gi
+    limits:
+      memory: 6Gi
+
+  tmp:
+    # Transcode scratch space. Here it lives inside the "scratch" volume below, so no
+    # separate volume is mounted: one would shadow that path and push transcodes onto
+    # the node's own disk. Set enabled: true to use a dedicated emptyDir/PVC instead.
+    enabled: false
+    mountPath: /media-scratch/ister
+
+  libraries:
+    - name: shows
+      type: SHOW
+    - name: music
+      type: MUSIC
+    - name: books
+      type: BOOK
+    # A library with no directory below is fetched rather than scanned.
+    - name: podcasts
+      type: PODCAST
+
+  # Mounted into the server; entries with a `library` are also scanned for media.
+  # Each entry takes exactly one source: hostPath, existingClaim or nfs.
+  mediaVolumes:
+    - name: shows
+      library: shows
+      mountPath: /media/shows
+      hostPath: /srv/media/shows
+    - name: music
+      library: music
+      mountPath: /media/music
+      hostPath: /srv/media/music
+    - name: books
+      library: books
+      mountPath: /media/books
+      hostPath: /srv/media/books
+    # Scratch space: mounted but not scanned (no `library`).
+    - name: scratch
+      mountPath: /media-scratch
+      hostPath: /srv/media/scratch
+
+website:
+  nodeSelector:
+    kubernetes.io/hostname: CHANGEME-node
+
+cache:
+  # Leave empty for the cluster's default StorageClass.
+  storageClass: ""
+  size: 20Gi
+
+ingress:
+  enabled: true
+  className: nginx
+  host: ister.example.com
+  tls:
+    enabled: true
+    # Leave empty to derive it from the host (ister-example-com-tls).
+    secretName: ""
+    # cert-manager ClusterIssuer; empty means you manage the certificate yourself.
+    certIssuer: letsencrypt-production
+  # Serves /.well-known/ister for client discovery. Needs allow-snippet-annotations=true
+  # in ingress-nginx, which is off by default — see README.md.
+  wellKnown:
+    enabled: false
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: 512m
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+
+database:
+  # Needs the CloudNativePG operator. Use mode: external to bring your own PostgreSQL,
+  # or mode: internal for a single unbacked-up pod (development only).
+  mode: cnpg
+  cnpg:
+    instances: 3
+    storageClass: ""
+    storageSize: 12Gi
+    backup:
+      # Backups and WAL archiving to S3-compatible storage (MinIO, Garage, AWS, ...).
+      # Also needs the CNPG barman-cloud plugin.
+      enabled: false
+      destinationPath: s3://CHANGEME-bucket/
+      endpointURL: https://s3.example.com
+      region: us-east-1
+      existingSecret: ister-backup-s3
+      schedule:
+        enabled: true
+        # Six fields — CNPG cron starts with seconds. This is 03:00 daily.
+        cron: "0 0 3 * * *"
+
+rabbitmq:
+  enabled: true
+  auth:
+    username: user
+    existingPasswordSecret: ister-rabbitmq-auth
+    existingErlangSecret: ister-rabbitmq-auth
+  persistence:
+    enabled: true
+    size: 8Gi
+
+typesense:
+  enabled: true
+  existingSecret: ister-search
+  persistence:
+    storageClass: ""
+    size: 8Gi
+
+# Needs the Prometheus Operator (ServiceMonitor + PodMonitor CRDs).
+monitoring:
+  enabled: false

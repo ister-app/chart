@@ -1,0 +1,31 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "ister.fullname" . }}-server
+  labels:
+    {{- include "ister.labels" (dict "ctx" . "component" "server") | nindent 4 }}
+spec:
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+    # Actuator. Kept on the same Service; the ServiceMonitor scrapes this port only.
+    - name: monitor
+      port: {{ .Values.server.managementPort }}
+      targetPort: monitor
+  selector:
+    {{- include "ister.selectorLabels" (dict "ctx" . "component" "server") | nindent 4 }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "ister.fullname" . }}-website
+  labels:
+    {{- include "ister.labels" (dict "ctx" . "component" "website") | nindent 4 }}
+spec:
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+  selector:
+    {{- include "ister.selectorLabels" (dict "ctx" . "component" "website") | nindent 4 }}

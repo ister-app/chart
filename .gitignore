@@ -1,0 +1,9 @@
+# Your real production values: hostnames, node names, paths. Keep them out of the repo.
+# Start from values-production.example.yaml.
+values-production.yaml
+
+# Local tooling config (contains absolute paths).
+.claude/
+
+# Pulled by `helm dependency build`.
+charts/
