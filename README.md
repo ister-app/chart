@@ -159,7 +159,13 @@ To run it locally (needs kind, helm, jq, ffmpeg, and a container runtime):
 
 ```sh
 git clone https://github.com/ister-app/testdata ../testdata
-(cd ../testdata && ./create_mkv.sh)          # the *.mkv fixtures are gitignored
+cd ../testdata
+# The *.mkv fixtures are gitignored, so they have to be encoded with ffmpeg. Generating
+# all of them takes ~10 minutes; the e2e only reads node1/disk1/{tv,movies}, so drop the
+# rest first and it takes ~4. CI caches the result and skips this entirely on a hit.
+rm -rf node2 node1/disk2 node1/disk1/music node1/disk1/books
+./create_mkv.sh
+cd -
 
 cd ..                                        # ci/kind-config.yaml mounts ./testdata
 kind create cluster --name ister-ci --config chart/ci/kind-config.yaml

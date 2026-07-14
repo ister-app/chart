@@ -69,25 +69,58 @@ jobs:
         with:
           path: chart
 
-      # The media fixtures are not committed (testdata/.gitignore excludes *.mkv), so
-      # they have to be generated. create_mkv.sh shells out to ffmpeg.
+      # The media fixtures are not committed (testdata/.gitignore excludes *.mkv), so they
+      # have to be generated with ffmpeg. That costs ~4.5 minutes, which is far too much to
+      # pay on every run — so cache the result. The key covers both the generator script and
+      # the testdata commit, so the fixtures are rebuilt exactly when either changes.
       - uses: actions/checkout@v4
         with:
           repository: ister-app/testdata
           path: testdata
 
+      - name: Resolve the testdata revision (for the cache key)
+        id: testdata
+        run: echo "sha=$(git -C testdata rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Restore media fixtures
+        id: fixtures
+        uses: actions/cache@v4
+        with:
+          path: testdata/node1/disk1
+          key: fixtures-${{ steps.testdata.outputs.sha }}-${{ hashFiles('testdata/create_mkv.sh') }}
+
+      # Only on a cache miss — which also means ffmpeg is only installed when it is used.
       - name: Generate media fixtures
+        if: steps.fixtures.outputs.cache-hit != 'true'
         run: |
           sudo apt-get update && sudo apt-get install -y ffmpeg
-          cd testdata && ./create_mkv.sh
-          echo "--- generated:"
-          find node1/disk1/tv node1/disk1/movies -name '*.mkv' | head -5
-          find node1/disk1 -name '*.mkv' | wc -l
+          cd testdata
+          # create_mkv.sh walks every node*/disk* it finds and encodes a 3-minute video per
+          # episode. The e2e only mounts node1/disk1/{tv,movies}, so drop the rest rather
+          # than spend minutes encoding video nothing will ever read.
+          rm -rf node2 node1/disk2 node1/disk1/music node1/disk1/books
+          ./create_mkv.sh
+
+      - name: Show the fixtures
+        run: |
+          echo "cache hit: ${{ steps.fixtures.outputs.cache-hit == 'true' }}"
+          echo "mkv files: $(find testdata/node1/disk1 -name '*.mkv' | wc -l)"
 
       - uses: azure/setup-helm@v4
         with:
           version: ${{ env.HELM_VERSION }}
 
+      # The rabbitmq subchart is a small OCI pull, but it is free to keep.
+      - name: Cache the chart dependencies
+        uses: actions/cache@v4
+        with:
+          path: chart/charts
+          key: helmdeps-${{ hashFiles('chart/Chart.lock') }}
+
+      # The container images (~1.5 GB in total, of which the native server image is ~690 MB)
+      # are deliberately NOT cached. Restoring them from the Actions cache is about as slow
+      # as pulling them from a registry the runner has a fast path to, and it would eat most
+      # of the 10 GB cache budget that the fixtures actually benefit from.
       - name: Create kind cluster
         uses: helm/kind-action@v1
         with:
