@@ -106,7 +106,15 @@ jobs:
           # episode. The e2e only mounts node1/disk1/{tv,movies}, so drop the rest rather
           # than spend minutes encoding video nothing will ever read.
           rm -rf node2 node1/disk2 node1/disk1/music node1/disk1/books
-          ./create_mkv.sh
+          # create_mkv.sh's exit status is simply that of its last statement — a bare
+          # `[ -d node1/disk1/music ] && create_music_structure …` test that we force false
+          # by removing music above, so the script exits 1 even on a full success. It also
+          # runs without `set -e`, so its exit code is no reliable success signal anyway.
+          # Ignore it and gate on the fixtures that actually got produced instead.
+          ./create_mkv.sh || true
+          count=$(find node1/disk1 -name '*.mkv' | wc -l)
+          echo "generated $count mkv fixtures"
+          [ "$count" -gt 0 ]
 
       - name: Show the fixtures
         run: |
