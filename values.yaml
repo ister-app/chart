@@ -398,8 +398,11 @@ flyway:
   enabled: true
   image:
     repository: ghcr.io/ister-app/migrations
-    # Versioned independently of the server — see the note on server.image.tag.
-    tag: "main"
+    # migrations publishes the same semver as the server, so it has no version line of its
+    # own: an empty tag makes ister.image fall back to .Chart.AppVersion, which release.yml
+    # derives from server.image.tag. Renovate bumping the server therefore bumps migrations
+    # too — one source of truth, always in lockstep.
+    tag: ""
     digest: ""
     pullPolicy: IfNotPresent
   # Image for the wait-for-db init container; needs pg_isready.

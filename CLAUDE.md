@@ -67,14 +67,16 @@ Automatic, and the details matter before you touch `Chart.yaml`:
 - The bump level comes from the commit messages since the last tag: `feat!`/`BREAKING CHANGE` →
   major, `feat` → minor, everything else (including Renovate's `fix(deps):`) → patch. So commit
   messages are functional here, not decoration.
-- The three ister images have **independent version lines** in `values.yaml`; they do not move in
-  lockstep, and `appVersion` speaks only for the server.
+- `server` and `player` have **independent version lines** in `values.yaml`; they do not move in
+  lockstep. `migrations` is the exception: it publishes the same semver as the server, so its
+  `flyway.image.tag` is left **empty** and `ister.image` falls back to `.Chart.AppVersion` (which
+  is `server.image.tag`). Renovate bumping the server therefore bumps migrations too — one source
+  of truth. `ci/release-notes.sh` mirrors that fallback so the migrations row is never blank.
 - Renovate (`renovate.json`), not Dependabot — Dependabot's docker manager cannot tell two images
   in one `values.yaml` apart when they share a tag string (dependabot-core#6891).
 
-`server` and `player` now publish semver tags: `values.yaml` pins both at `1.0.0` and Renovate
-bumps them from there. `migrations` still publishes only `:main`, so its `tag` stays `"main"`
-until it cuts a real release.
+`server` and `player` publish semver tags: `values.yaml` pins both at `1.0.0` and Renovate bumps
+them from there. `migrations` has no `tag` of its own — see the appVersion note above.
 
 ## Conventions
 

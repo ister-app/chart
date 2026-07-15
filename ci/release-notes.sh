@@ -37,6 +37,12 @@ print(doc)
 }
 img() { yaml values.yaml "$1"; }
 
+# migrations has no tag of its own: it rides .Chart.AppVersion (== server version), the same
+# fallback ister.image does when flyway.image.tag is empty. Mirror it here so the table shows
+# the version actually deployed rather than a blank cell.
+mig_tag="$(img flyway.image.tag)"
+[ -n "$mig_tag" ] || mig_tag="$(img server.image.tag)"
+
 {
   echo "## ister-chart v${VERSION}"
   echo
@@ -44,7 +50,7 @@ img() { yaml values.yaml "$1"; }
   echo "|---|---|---|"
   echo "| server | \`$(img server.image.repository)\` | $(img server.image.tag) |"
   echo "| website | \`$(img website.image.repository)\` | $(img website.image.tag) |"
-  echo "| migrations | \`$(img flyway.image.repository)\` | $(img flyway.image.tag) |"
+  echo "| migrations | \`$(img flyway.image.repository)\` | ${mig_tag} |"
   echo "| database | \`$(img database.internal.image.repository)\` | $(img database.internal.image.tag) |"
   echo "| typesense | \`$(img typesense.image.repository)\` | $(img typesense.image.tag) |"
   echo "| rabbitmq | subchart \`bitnamicharts/rabbitmq\` | $(python3 -c '
