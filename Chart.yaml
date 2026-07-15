@@ -6,7 +6,7 @@ kubeVersion: ">=1.25.0-0"
 
 # Chart version. Bumped by .github/workflows/release.yml on every merge that touches the
 # chart — do not edit by hand.
-version: 0.2.1
+version: 0.2.2
 
 # The server image version this chart deploys, mirrored onto pods as app.kubernetes.io/version.
 # Derived from values.yaml server.image.tag by the release workflow, so it cannot drift from it.
