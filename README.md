@@ -194,22 +194,22 @@ the moment the two happen to land on the same version.
 
 **Two things still have to be set up for this to work:**
 
-1. **The app repos must publish semver tags.** `ghcr.io/ister-app/{server,player,migrations}`
-   currently publish only `:main`, which is why `values.yaml` still pins `tag: "main"` — there
-   is no version to pin to. Add semver tags to each repo's publish workflow:
+1. **The app repos must publish semver tags.** `server` and `player` now do, and `values.yaml`
+   pins both at `1.0.0` with Renovate taking over from there. `ghcr.io/ister-app/migrations`
+   still publishes only `:main`, which is why its `tag` stays `"main"` — there is no version to
+   pin to yet. To fix it, add semver tags to the migrations publish workflow the same way:
 
    ```yaml
    - uses: docker/metadata-action@v5
      with:
-       images: ghcr.io/ister-app/server
+       images: ghcr.io/ister-app/migrations
        tags: |
          type=semver,pattern={{version}}
          type=semver,pattern={{major}}.{{minor}}
          type=ref,event=branch          # keeps publishing :main for dev
    ```
 
-   Then set the tag in `values.yaml` to that first release (e.g. `"1.0.0"`) once, and Renovate
-   takes it from there.
+   Then set the tag in `values.yaml` to that first release once, and Renovate takes it from there.
 
 2. **Repo settings.** Install the Renovate GitHub App on the org; enable "Allow auto-merge";
    protect `main` with CI as a required check, and let `github-actions` bypass it — the

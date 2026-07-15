@@ -72,8 +72,9 @@ Automatic, and the details matter before you touch `Chart.yaml`:
 - Renovate (`renovate.json`), not Dependabot — Dependabot's docker manager cannot tell two images
   in one `values.yaml` apart when they share a tag string (dependabot-core#6891).
 
-Not yet wired up (see README "Releasing"): the app repos publish only `:main`, no semver tags, so
-`values.yaml` still pins `tag: "main"` and Renovate has nothing to bump.
+`server` and `player` now publish semver tags: `values.yaml` pins both at `1.0.0` and Renovate
+bumps them from there. `migrations` still publishes only `:main`, so its `tag` stays `"main"`
+until it cuts a real release.
 
 ## Conventions
 
