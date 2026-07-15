@@ -212,8 +212,8 @@ the moment the two happen to land on the same version.
    takes it from there.
 
 2. **Repo settings.** Install the Renovate GitHub App on the org; enable "Allow auto-merge";
-   protect `master` with CI as a required check, and let `github-actions` bypass it — the
-   release workflow pushes the `chore(release):` commit back to `master`.
+   protect `main` with CI as a required check, and let `github-actions` bypass it — the
+   release workflow pushes the `chore(release):` commit back to `main`.
 
 ## CI
 

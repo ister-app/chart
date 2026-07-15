@@ -7,7 +7,7 @@
 # block to CHANGELOG.md. Runs fine outside CI, so the formatting can be checked locally.
 #
 # `gh release create --generate-notes` is not enough here: it lists PR titles only, so
-# commits pushed straight to master go missing, and it cannot say which image versions the
+# commits pushed straight to main go missing, and it cannot say which image versions the
 # chart actually deploys — which, with server/player/migrations on independent version
 # lines, is the first thing anyone reading a chart release wants to know.
 set -euo pipefail

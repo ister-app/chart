@@ -6,7 +6,7 @@ name: Release
 # chart — no human step in between.
 on:
   push:
-    branches: [master]
+    branches: [main]
     paths:
       - Chart.yaml
       - values.yaml
@@ -20,7 +20,7 @@ on:
         default: auto
         options: [auto, patch, minor, major]
 
-# Two releases racing would fight over the tag and the master commit.
+# Two releases racing would fight over the tag and the main commit.
 concurrency:
   group: release
   cancel-in-progress: false
@@ -127,11 +127,11 @@ jobs:
           git commit -m "chore(release): v${VERSION}"
 
           # Annotated on purpose: --follow-tags below pushes annotated tags only, and a
-          # lightweight one would silently stay behind on the runner — master would carry the
+          # lightweight one would silently stay behind on the runner — main would carry the
           # release commit while the tag, the GitHub Release, and the next night's
           # `git describe` all went missing.
           git tag -a "v${VERSION}" -m "v${VERSION}"
-          git push origin HEAD:master --follow-tags
+          git push origin HEAD:main --follow-tags
 
           gh release create "v${VERSION}" "ister-${VERSION}.tgz" \
             --title "v${VERSION}" \
