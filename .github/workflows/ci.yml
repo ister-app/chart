@@ -56,13 +56,16 @@ jobs:
             --set typesense.enabled=false --set typesense.external.host=ts \
             --set typesense.external.existingSecret=ts > /dev/null
 
+      # kubeconform's image has no helm, so render on the runner first (helm is set up above,
+      # and `dependency build` already resolved the subchart) and hand the file to the
+      # container's own /kubeconform entrypoint — piping helm *inside* the image cannot work.
+      - name: Render for schema validation
+        run: helm template ister . -f ci/values-ci.yaml > kubeconform-manifests.yaml
+
       - name: Validate rendered manifests against Kubernetes schemas
         uses: docker://ghcr.io/yannh/kubeconform:latest-alpine
         with:
-          entrypoint: /bin/sh
-          args: >-
-            -c "helm template ister . -f ci/values-ci.yaml |
-                kubeconform -strict -summary -ignore-missing-schemas"
+          args: -strict -summary -ignore-missing-schemas kubeconform-manifests.yaml
 
   e2e:
     name: End-to-end on kind

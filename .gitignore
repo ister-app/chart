@@ -12,3 +12,6 @@ charts/
 # RELEASE_NOTES.md is only ever handed to `gh release create`.
 *.tgz
 RELEASE_NOTES.md
+
+# Rendered manifests the CI kubeconform step feeds to the container.
+kubeconform-manifests.yaml
