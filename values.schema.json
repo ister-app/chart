@@ -160,12 +160,18 @@
       "properties": {
         "enabled": { "type": "boolean" },
         "image": { "$ref": "#/definitions/image" },
-        "waitImage": { "type": "string" }
+        "waitImage": { "$ref": "#/definitions/image" }
       }
     },
     "monitoring": {
       "type": "object",
       "properties": { "enabled": { "type": "boolean" } }
+    },
+    "tests": {
+      "type": "object",
+      "properties": {
+        "image": { "$ref": "#/definitions/image" }
+      }
     }
   },
   "definitions": {

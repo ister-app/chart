@@ -1,0 +1,138 @@
+name: Release
+
+# Every change to the chart itself releases a new version: bump Chart.yaml, package, push
+# to ghcr as an OCI artifact, tag, and cut a GitHub Release with notes built from the
+# commits. A Renovate PR that bumps an image tag is therefore all it takes to ship a new
+# chart — no human step in between.
+on:
+  push:
+    branches: [master]
+    paths:
+      - Chart.yaml
+      - values.yaml
+      - values.schema.json
+      - templates/**
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: Version bump (auto = derived from the commits since the last tag)
+        type: choice
+        default: auto
+        options: [auto, patch, minor, major]
+
+# Two releases racing would fight over the tag and the master commit.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+permissions:
+  contents: write   # commit the bump, push the tag, create the release
+  packages: write   # helm push to ghcr
+
+jobs:
+  # The release commit is pushed by this workflow. Without the guard it would trigger
+  # itself and release again, forever.
+  ci:
+    if: ${{ !startsWith(github.event.head_commit.message, 'chore(release):') }}
+    uses: ./.github/workflows/ci.yml
+
+  release:
+    needs: ci
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Tags and full history: the bump level and the release notes are both derived
+          # from the commits since the previous tag.
+          fetch-depth: 0
+
+      - uses: azure/setup-helm@v4
+        with:
+          version: v3.16.3
+
+      - name: Work out the new chart version
+        id: version
+        run: |
+          current=$(yq -r .version Chart.yaml)
+          prev=$(git describe --tags --abbrev=0 2>/dev/null || true)
+          range="${prev:+$prev..}HEAD"
+
+          bump="${{ inputs.bump || 'auto' }}"
+          if [ "$bump" = auto ]; then
+            log=$(git log --no-merges --pretty='%s%n%b' "$range")
+            if grep -qP '^[a-z]+(\(.+\))?!:|^BREAKING[ -]CHANGE' <<<"$log"; then
+              bump=major
+            elif grep -qP '^feat(\(.+\))?:' <<<"$log"; then
+              bump=minor
+            else
+              # Renovate's image bumps land here (fix(deps):), as does anything unlabelled.
+              bump=patch
+            fi
+          fi
+
+          next=$(awk -F. -v b="$bump" '{
+            if (b == "major")      printf "%d.0.0\n", $1 + 1
+            else if (b == "minor") printf "%d.%d.0\n", $1, $2 + 1
+            else                   printf "%d.%d.%d\n", $1, $2, $3 + 1
+          }' <<<"$current")
+
+          echo "prev=$prev"    >> "$GITHUB_OUTPUT"
+          echo "bump=$bump"    >> "$GITHUB_OUTPUT"
+          echo "version=$next" >> "$GITHUB_OUTPUT"
+          echo "::notice::$current -> $next ($bump, since ${prev:-the root commit})"
+
+      - name: Bump Chart.yaml
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          # appVersion follows the server image: it is what app.kubernetes.io/version ends up
+          # meaning on the pods. The website and migrations images have their own version
+          # lines and are reported in the release notes instead.
+          app=$(python3 -c 'import yaml; print(yaml.safe_load(open("values.yaml"))["server"]["image"]["tag"])')
+
+          # sed, not `yq -i`: yq round-trips the comments but drops every blank line, so each
+          # release would reflow the whole file. Only top-level keys sit at column 0 here, so
+          # the anchors cannot hit the subchart's own `version:` under dependencies.
+          sed -i -E "s|^version: .*|version: ${VERSION}|" Chart.yaml
+          sed -i -E "s|^appVersion: .*|appVersion: \"${app}\"|" Chart.yaml
+
+          # A silently non-matching sed would publish the old version under a new tag.
+          grep -qx "version: ${VERSION}" Chart.yaml || { echo "version not written" >&2; exit 1; }
+          grep -qx "appVersion: \"${app}\"" Chart.yaml || { echo "appVersion not written" >&2; exit 1; }
+          git --no-pager diff Chart.yaml
+
+      - name: Generate release notes
+        run: ./ci/release-notes.sh "${{ steps.version.outputs.version }}" "${{ steps.version.outputs.prev }}"
+
+      - name: Package
+        run: |
+          helm dependency build
+          helm package .
+
+      - name: Push the chart to ghcr
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          helm registry login ghcr.io -u ${{ github.actor }} --password ${{ secrets.GITHUB_TOKEN }}
+          helm push "ister-${VERSION}.tgz" oci://ghcr.io/${{ github.repository_owner }}/charts
+
+      - name: Commit, tag and release
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Chart.yaml CHANGELOG.md
+          git commit -m "chore(release): v${VERSION}"
+
+          # Annotated on purpose: --follow-tags below pushes annotated tags only, and a
+          # lightweight one would silently stay behind on the runner — master would carry the
+          # release commit while the tag, the GitHub Release, and the next night's
+          # `git describe` all went missing.
+          git tag -a "v${VERSION}" -m "v${VERSION}"
+          git push origin HEAD:master --follow-tags
+
+          gh release create "v${VERSION}" "ister-${VERSION}.tgz" \
+            --title "v${VERSION}" \
+            --notes-file RELEASE_NOTES.md

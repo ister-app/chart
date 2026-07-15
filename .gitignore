@@ -7,3 +7,8 @@ values-production.yaml
 
 # Pulled by `helm dependency build`.
 charts/
+
+# Build artefacts of `helm package` and ci/release-notes.sh. CHANGELOG.md is committed,
+# RELEASE_NOTES.md is only ever handed to `gh release create`.
+*.tgz
+RELEASE_NOTES.md

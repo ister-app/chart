@@ -27,8 +27,10 @@ server:
 
   image:
     repository: ghcr.io/ister-app/server
-    # Defaults to .Chart.AppVersion. Set a digest for a reproducible rollback.
-    tag: ""
+    # Renovate keeps this tag current — see renovate.json. Now that the server repo publishes
+    # semver tags, Renovate bumps this from here. Empty falls back to .Chart.AppVersion.
+    # Set a digest for a reproducible rollback.
+    tag: "1.0.0"
     digest: ""
     pullPolicy: IfNotPresent
 
@@ -138,7 +140,8 @@ server:
 website:
   image:
     repository: ghcr.io/ister-app/player
-    tag: ""
+    # Versioned independently of the server — see the note on server.image.tag.
+    tag: "1.0.0"
     digest: ""
     pullPolicy: IfNotPresent
   replicaCount: 1
@@ -395,11 +398,17 @@ flyway:
   enabled: true
   image:
     repository: ghcr.io/ister-app/migrations
-    tag: ""
+    # Versioned independently of the server — see the note on server.image.tag.
+    tag: "main"
     digest: ""
     pullPolicy: IfNotPresent
   # Image for the wait-for-db init container; needs pg_isready.
-  waitImage: postgres:18-alpine
+  # A {repository, tag} map rather than a "repo:tag" string, so Renovate tracks it too —
+  # its helm-values manager only recognises the structured form.
+  waitImage:
+    repository: postgres
+    tag: "18-alpine"
+    pullPolicy: IfNotPresent
   resources:
     requests:
       cpu: 100m
@@ -422,3 +431,13 @@ monitoring:
 podDisruptionBudget:
   enabled: false
   minAvailable: 1
+
+# ============================================================
+# `helm test` — the smoke-test Pod in templates/tests/.
+# Here rather than hardcoded in the template so Renovate can track the image.
+# ============================================================
+tests:
+  image:
+    repository: curlimages/curl
+    tag: "8.11.1"
+    pullPolicy: IfNotPresent

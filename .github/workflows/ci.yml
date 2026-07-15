@@ -5,12 +5,16 @@ on:
     branches: [master, main]
   pull_request:
   workflow_dispatch:
+  # release.yml runs these same jobs on the merged commit before it publishes anything,
+  # so a chart can never be released on a red e2e.
+  workflow_call:
   # So the server/player repos can re-run this after publishing new :main images.
   repository_dispatch:
     types: [images-published]
   schedule:
-    # The chart tracks the mutable :main tags, so a green CI can go red without anyone
-    # touching this repo. Catch that on a schedule rather than on the next release.
+    # The dev/CI profiles deploy the mutable :main tags, and the kind + actions environment
+    # moves under us regardless. Either can turn a green CI red without anyone touching this
+    # repo, so catch it on a schedule rather than on the next release.
     - cron: "0 5 * * 1"
 
 env:

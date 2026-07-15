@@ -1,0 +1,41 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended",
+    ":dependencyDashboard",
+    ":semanticCommits"
+  ],
+  "timezone": "Europe/Amsterdam",
+  "schedule": ["* 0-6 * * *"],
+
+  "semanticCommitType": "fix",
+  "semanticCommitScope": "deps",
+
+  "packageRules": [
+    {
+      "description": "Third-party images and the RabbitMQ subchart: automerge patches only. A minor bump of Postgres or Typesense is a real upgrade of a stateful component, so it gets a human.",
+      "matchDatasources": ["docker", "helm"],
+      "matchUpdateTypes": ["patch", "digest"],
+      "automerge": true
+    },
+    {
+      "description": "First-party ister images. Each gets its own PR and its own version line — server, player and migrations do not move in lockstep.",
+      "matchDatasources": ["docker"],
+      "matchPackageNames": ["ghcr.io/ister-app/**"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "automerge": true
+    },
+    {
+      "description": "GitHub Actions. Grouped, and chore(deps) rather than fix(deps) so a bumped action does not release a new chart — see .github/workflows/release.yml.",
+      "matchManagers": ["github-actions"],
+      "groupName": "github actions",
+      "semanticCommitType": "chore",
+      "automerge": true
+    },
+    {
+      "description": "Majors are never automerged. They land on the dependency dashboard and wait for a human.",
+      "matchUpdateTypes": ["major"],
+      "automerge": false
+    }
+  ]
+}

@@ -5,6 +5,15 @@ backend, a web frontend, PostgreSQL, RabbitMQ and Typesense.
 
 ## Install
 
+Released charts are pushed to ghcr.io as OCI artifacts:
+
+```sh
+helm install ister oci://ghcr.io/ister-app/charts/ister --version 0.2.0 \
+  -n ister --create-namespace -f values-production.yaml
+```
+
+From a checkout instead — which is what you want when changing the chart:
+
 ```sh
 helm dependency build
 
@@ -134,13 +143,87 @@ helm template ister . -f values-production.yaml | kubectl apply --dry-run=server
 helm test ister -n ister
 ```
 
+## Releasing
+
+Releases are automatic. Merging anything that touches the chart (`Chart.yaml`, `values.yaml`,
+`values.schema.json`, `templates/`) runs `.github/workflows/release.yml`, which re-runs the
+full CI on the merged commit and only then bumps, packages, pushes and publishes:
+
+| commit | chart bump |
+|---|---|
+| `feat(...)!:` or `BREAKING CHANGE:` in the body | major |
+| `feat:` | minor |
+| everything else, including Renovate's `fix(deps):` | patch |
+| `chore(deps):` (GitHub Actions bumps) | no release — `.github/` is not in the trigger paths |
+
+`workflow_dispatch` takes an explicit `bump` if you need to override that.
+
+The workflow writes the new version into `Chart.yaml`, sets `appVersion` to the **server**
+image tag, generates the release notes, pushes `oci://ghcr.io/ister-app/charts/ister`, tags
+`v<version>` and cuts a GitHub Release with the `.tgz` attached. `ci/release-notes.sh` builds
+the notes from the commits since the previous tag, grouped by conventional-commit type, with a
+table of the image versions the release actually deploys. It runs locally too:
+
+```sh
+ci/release-notes.sh 0.3.0 v0.2.0 && cat RELEASE_NOTES.md
+```
+
+### Versions
+
+Three versions, three meanings:
+
+- **chart version** (`Chart.yaml: version`) — this chart's own semver. Bumped by the release
+  workflow, never by hand.
+- **appVersion** (`Chart.yaml: appVersion`) — the server image version, mirrored onto pods as
+  `app.kubernetes.io/version`. Derived, not authored.
+- **image tags** (`values.yaml`) — `server`, `player` and `migrations` each have their own
+  version line and move independently. They are the actual source of truth.
+
+### Renovate
+
+`renovate.json` keeps every image tag in `values.yaml`, the RabbitMQ subchart in `Chart.yaml`
+and the pinned GitHub Actions up to date. Each image gets its own PR, CI (including the kind
+e2e) runs on it, and patch/minor bumps automerge — so a new server release becomes a new chart
+release without a human in the loop. Majors wait on the dependency dashboard.
+
+Renovate rather than Dependabot because Dependabot's docker manager cannot tell two images in
+one `values.yaml` apart when they carry the same tag string
+([dependabot-core#6891](https://github.com/dependabot/dependabot-core/issues/6891), closed as
+not planned) — it bumps both. With independent version lines for server and player, that breaks
+the moment the two happen to land on the same version.
+
+**Two things still have to be set up for this to work:**
+
+1. **The app repos must publish semver tags.** `ghcr.io/ister-app/{server,player,migrations}`
+   currently publish only `:main`, which is why `values.yaml` still pins `tag: "main"` — there
+   is no version to pin to. Add semver tags to each repo's publish workflow:
+
+   ```yaml
+   - uses: docker/metadata-action@v5
+     with:
+       images: ghcr.io/ister-app/server
+       tags: |
+         type=semver,pattern={{version}}
+         type=semver,pattern={{major}}.{{minor}}
+         type=ref,event=branch          # keeps publishing :main for dev
+   ```
+
+   Then set the tag in `values.yaml` to that first release (e.g. `"1.0.0"`) once, and Renovate
+   takes it from there.
+
+2. **Repo settings.** Install the Renovate GitHub App on the org; enable "Allow auto-merge";
+   protect `master` with CI as a required check, and let `github-actions` bypass it — the
+   release workflow pushes the `chore(release):` commit back to `master`.
+
 ## CI
 
 `.github/workflows/ci.yml` lints and renders every profile, then stands the whole stack up
 on a kind cluster and tests that it actually works. It runs on push and PR, on a weekly
-schedule (the chart tracks mutable `:main` image tags, so CI can go red without anyone
-touching this repo), and on a `repository_dispatch` of type `images-published` so the app
-repos can re-run it after publishing new images.
+schedule (the dev profiles deploy mutable `:main` images and the kind/actions environment
+moves regardless, so CI can go red without anyone touching this repo), on a
+`repository_dispatch` of type `images-published` so the app repos can re-run it after
+publishing new images, and via `workflow_call` from the release workflow — a chart is never
+released on a red e2e.
 
 Two levels of test:
 

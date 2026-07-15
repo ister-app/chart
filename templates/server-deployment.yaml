@@ -55,7 +55,8 @@ spec:
         # same release, so a pre-install hook would wait for a database that Helm has not
         # created yet. Init containers get the ordering right in every database mode.
         - name: wait-for-db
-          image: {{ .Values.flyway.waitImage | quote }}
+          image: {{ include "ister.image" (dict "ctx" . "image" .Values.flyway.waitImage) | quote }}
+          imagePullPolicy: {{ .Values.flyway.waitImage.pullPolicy }}
           securityContext:
             {{- toYaml .Values.server.securityContext | nindent 12 }}
           command:

@@ -12,7 +12,8 @@ spec:
   automountServiceAccountToken: false
   containers:
     - name: check
-      image: curlimages/curl:8.11.1
+      image: {{ include "ister.image" (dict "ctx" . "image" .Values.tests.image) | quote }}
+      imagePullPolicy: {{ .Values.tests.image.pullPolicy }}
       securityContext:
         allowPrivilegeEscalation: false
         capabilities:
