@@ -359,7 +359,7 @@ spec:
     spec:
       containers:
         - name: wiremock
-          image: wiremock/wiremock:3.13.1
+          image: wiremock/wiremock:3.13.2
           args: ["--port", "8080", "--global-response-templating", "--disable-banner"]
           ports:
             - name: http
