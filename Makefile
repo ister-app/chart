@@ -19,7 +19,7 @@ fixtures:
 	cd $(TESTDATA_DIR) && ./create_books.sh && ./create_comics.sh && ./create_podcast_feed.sh http://podcast-feed:8080
 
 # Image pinning is passed through to ci/up.sh; default is the chart's own pinned version.
-#   make up SERVER_IMAGE_TAG=1.2.0-SNAPSHOT
+#   make up SERVER_IMAGE_TAG=1.2.0-snapshot
 #   make up SERVER_IMAGE_REPOSITORY=localhost/ister-server SERVER_IMAGE_TAG=dev SERVER_IMAGE_PULL_POLICY=Never
 up:
 	TESTDATA_DIR=$(TESTDATA_DIR) CLUSTER_NAME=$(CLUSTER_NAME) NAMESPACE=$(NAMESPACE) RELEASE=$(RELEASE) \

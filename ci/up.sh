@@ -17,7 +17,7 @@
 #   MIGRATIONS_IMAGE_REPOSITORY / MIGRATIONS_IMAGE_TAG (tag defaults to SERVER_IMAGE_TAG:
 #   the images are published in lockstep under the same version tag)
 # Examples:
-#   SERVER_IMAGE_TAG=1.2.0-SNAPSHOT ci/up.sh       # a published dev build (or "1.1.0")
+#   SERVER_IMAGE_TAG=1.2.0-snapshot ci/up.sh       # a published dev build (or "1.1.0")
 #   SERVER_IMAGE_REPOSITORY=localhost/ister-server SERVER_IMAGE_TAG=dev \
 #     SERVER_IMAGE_PULL_POLICY=Never ci/up.sh      # a locally built, kind-loaded image
 
