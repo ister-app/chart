@@ -25,8 +25,30 @@ There are four value profiles and CI renders all of them; a change to `values.ya
 must survive `values-dev.yaml`, `values-production.example.yaml`, `ci/values-ci.yaml`, and the
 all-external permutation (no bundled datastores) spelled out in `.github/workflows/ci.yml`.
 
-Full e2e on kind (needs kind, jq, ffmpeg, a container runtime) — the exact sequence is in
-README.md under "CI". `helm test ister -n ister --logs` runs the shipped smoke test alone.
+Full e2e on kind (needs kind, helm, jq, ffmpeg, zip, a container runtime, and the testdata repo
+cloned as a sibling):
+
+```sh
+make up          # fixtures + kind + mock-oidc/podcast-feed/mock-external + helm install
+make e2e         # ci/e2e.sh: the scenario scripts in ci/e2e/, in order
+make player-e2e  # the player repo's Flutter integration tests (needs ../player + flutter)
+make down
+```
+
+`ci/e2e.sh` sources `ci/e2e/lib.sh` and runs the numbered scenarios (scan, metadata enrichment,
+podcast, HLS streaming with a real transcode, books, search, watch status); select with
+`E2E_ONLY='30-*'`/`E2E_SKIP`. `ci/up.sh` is idempotent and takes image pins
+(`SERVER_IMAGE_TAG=1.2.0-SNAPSHOT`, or a locally built image with
+`SERVER_IMAGE_REPOSITORY=localhost/... SERVER_IMAGE_PULL_POLICY=Never` after a `kind load`).
+`helm test ister -n ister --logs` runs the shipped smoke test alone.
+
+**CI-only pods** (`ci/*.yaml`, not part of the chart): `mock-oidc.yaml` (JWT issuer),
+`podcast-feed.yaml` (serves the generated feed), and `mock-external.yaml` — a WireMock pod
+serving every external metadata source (TMDB, MusicBrainz, Cover Art Archive, Open Library,
+Wikidata/Wikipedia, Commons, iTunes) under path prefixes, wired to the server through
+`server.extraEnv` in `ci/values-ci.yaml`. The `15-metadata` scenario asserts enrichment lands
+and that zero events dead-letter, so an unstubbed call fails CI — extend the stubs when the
+server grows a new external call.
 
 ## Architecture
 
