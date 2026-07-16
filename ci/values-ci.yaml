@@ -3,10 +3,44 @@
 
 server:
   name: ci
-  tmdbApiKey: not-a-real-key   # indexing works without TMDB; enrichment just logs and skips
+  tmdbApiKey: mock-key   # ci/mock-external.yaml accepts any key
   oidc:
     # Must match the `iss` claim the mock issuer mints — see ci/mock-oidc.yaml.
     url: http://mock-oidc:8080/default
+
+  # Every external metadata source is served by ci/mock-external.yaml, so enrichment is
+  # deterministic and needs no internet. Each service lives under its own path prefix.
+  extraEnv:
+    - name: SPRING_CLOUD_OPENFEIGN_CLIENT_CONFIG_TMDB_URL
+      value: http://mock-external:8080/tmdb
+    - name: APP_ISTER_WORKER_TMDB_IMAGE_BASE
+      value: http://mock-external:8080/img/tmdb
+    - name: APP_ISTER_WORKER_MUSICBRAINZ_BASE
+      value: http://mock-external:8080/musicbrainz
+    - name: APP_ISTER_WORKER_MUSICBRAINZ_COVERART_RELEASE_BASE
+      value: http://mock-external:8080/img/coverart/release
+    - name: APP_ISTER_WORKER_MUSICBRAINZ_COVERART_RELEASE_GROUP_BASE
+      value: http://mock-external:8080/img/coverart/release-group
+    - name: APP_ISTER_WORKER_MUSICBRAINZ_COMMONS_FILEPATH_BASE
+      value: http://mock-external:8080/img/commons/
+    - name: APP_ISTER_WORKER_OPENLIBRARY_BASE
+      value: http://mock-external:8080/openlibrary
+    - name: APP_ISTER_WORKER_OPENLIBRARY_COVERS_BASE
+      value: http://mock-external:8080/img/olcovers/
+    - name: APP_ISTER_WORKER_OPENLIBRARY_AUTHOR_PHOTO_BASE
+      value: http://mock-external:8080/img/olauthor/
+    - name: APP_ISTER_WORKER_WIKIDATA_ENTITY_BASE
+      value: http://mock-external:8080/wikidata/entity/
+    - name: APP_ISTER_WORKER_WIKIDATA_API_BASE
+      value: http://mock-external:8080/wikidata/api
+    - name: APP_ISTER_WORKER_WIKIPEDIA_SUMMARY_TEMPLATE
+      value: http://mock-external:8080/wikipedia/{lang}/summary/{title}
+    - name: APP_ISTER_API_PODCAST_ITUNES_BASE
+      value: http://mock-external:8080/itunes
+
+  # server.url is deliberately NOT set: the default (http://localhost:8080/api) is what
+  # /.well-known/ister advertises, and that is exactly where the player integration
+  # tests reach the server through `kubectl port-forward ... 8080:8080`.
 
   resources:
     requests:
@@ -26,6 +60,15 @@ server:
       type: SHOW
     - name: movies
       type: MOVIE
+    - name: music
+      type: MUSIC
+    - name: books
+      type: BOOK
+    - name: comics
+      type: COMIC
+    # Podcast episodes are downloaded into the cache PVC, so no mediaVolume is needed.
+    - name: podcasts
+      type: PODCAST
 
   # /testdata is mounted into the kind node by ci/kind-config.yaml.
   mediaVolumes:
@@ -37,6 +80,18 @@ server:
       library: movies
       mountPath: /media/movies
       hostPath: /testdata/node1/disk1/movies
+    - name: music
+      library: music
+      mountPath: /media/music
+      hostPath: /testdata/node1/disk1/music
+    - name: books
+      library: books
+      mountPath: /media/books
+      hostPath: /testdata/node1/disk1/books
+    - name: comics
+      library: comics
+      mountPath: /media/comics
+      hostPath: /testdata/node1/disk1/comics
 
 website:
   resources:
@@ -47,7 +102,8 @@ website:
       memory: 128Mi
 
 cache:
-  size: 1Gi
+  # HLS transcode output + downloaded podcast episodes both land here.
+  size: 2Gi
   retain: false
 
 ingress:

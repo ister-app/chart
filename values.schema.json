@@ -36,7 +36,7 @@
               "name": { "type": "string" },
               "type": {
                 "type": "string",
-                "enum": ["SHOW", "MOVIE", "MUSIC", "BOOK", "PODCAST"]
+                "enum": ["SHOW", "MOVIE", "MUSIC", "BOOK", "PODCAST", "COMIC"]
               }
             }
           }

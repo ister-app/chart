@@ -225,42 +225,41 @@ moves regardless, so CI can go red without anyone touching this repo), on a
 publishing new images, and via `workflow_call` from the release workflow — a chart is never
 released on a red e2e.
 
-Two levels of test:
+Three levels of test:
 
 - **`helm test`** — unauthenticated, ships with the chart, so users can run it against
   their own install. Checks actuator health, `/.well-known/ister`, the website, Typesense,
   and the `getServerInfo` GraphQL query. That last one reads the node registry from the
   database, so it proves Postgres is up, Flyway migrated, and the server registered itself.
-- **`ci/e2e.sh`** — the real thing: mints a JWT, calls the `scanLibrary` mutation, and
-  polls until the scanner has indexed shows and movies from the `ister-app/testdata`
-  fixtures. This needs an OIDC issuer, because `scanLibrary` and every content query are
+- **`ci/e2e.sh`** — the real thing: mints a JWT and runs the scenario scripts in
+  `ci/e2e/` in order: `10-scan` (every library type indexes: shows, movies, albums, books
+  with audiobook chapters and media-overlay detection, comic series with page counts),
+  `15-metadata` (enrichment through the mocked external sources actually lands, and zero
+  events dead-letter), `20-podcast` (subscribe → refresh → download against the in-cluster
+  `ci/podcast-feed.yaml` server), `30-streaming` (stream token → HLS master playlist → a
+  real ffmpeg-transcoded segment), `40-books` (epub resources + reading-progress
+  round-trip), `50-search` (Typesense, shows and movies) and `60-watch-status` (play queue
+  heartbeat → recentlyWatched).
+  This needs an OIDC issuer, because `scanLibrary` and every content query are
   `@PreAuthorize("hasRole('user')")` — hence `ci/mock-oidc.yaml`, a mock issuer minting
-  tokens with a `roles: ["user"]` claim. Indexing itself needs no TMDB key and no internet:
-  shows and movies are derived from filenames and local `.nfo` files.
+  tokens with a `roles: ["user"]` claim. All external metadata sources (TMDB, MusicBrainz,
+  Cover Art Archive, Open Library, Wikidata/Wikipedia, Wikimedia Commons, iTunes) are
+  served by `ci/mock-external.yaml`, a WireMock pod the server is pointed at via
+  `server.extraEnv` in `ci/values-ci.yaml` — deterministic, offline, no rate limits, no
+  real TMDB key. `E2E_ONLY='30-*'`/`E2E_SKIP` select scenarios during local iteration.
+- **Player integration tests** — live in the `ister-app/player` repo
+  (`integration_test/`) and run the real Flutter app against this same kind deployment:
+  add-server flow, movie playback over HLS, audiobook and podcast playback, epub reading
+  with progress sync, and read-aloud. Their CI job checks out this chart and reuses
+  `ci/up.sh`. The tests reach the server on `localhost:8080` (the chart's default
+  advertised `server.url`) via `ci/e2e/forward-for-player.sh`.
 
-To run it locally (needs kind, helm, jq, ffmpeg, and a container runtime):
+To run it locally (needs kind, helm, jq, ffmpeg, zip, and a container runtime; the
+testdata repo cloned next to this one):
 
 ```sh
-git clone https://github.com/ister-app/testdata ../testdata
-cd ../testdata
-# The *.mkv fixtures are gitignored, so they have to be encoded with ffmpeg. Generating
-# all of them takes ~10 minutes; the e2e only reads node1/disk1/{tv,movies}, so drop the
-# rest first and it takes ~4. CI caches the result and skips this entirely on a hit.
-rm -rf node2 node1/disk2 node1/disk1/music node1/disk1/books
-./create_mkv.sh
-cd -
-
-cd ..                                        # ci/kind-config.yaml mounts ./testdata
-kind create cluster --name ister-ci --config chart/ci/kind-config.yaml
-cd chart
-
-kubectl create namespace ister
-kubectl apply -n ister -f ci/mock-oidc.yaml
-helm dependency build
-helm install ister . -n ister -f ci/values-ci.yaml --wait --timeout 12m
-
-helm test ister -n ister --logs
-./ci/e2e.sh ister ister
-
-kind delete cluster --name ister-ci
+make up          # fixtures + kind cluster + mock-oidc + podcast-feed + chart install
+make e2e         # the API e2e scenarios
+make player-e2e  # the player's Flutter integration tests (needs ../player + flutter)
+make down        # delete the kind cluster
 ```

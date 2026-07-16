@@ -70,7 +70,7 @@ jobs:
   e2e:
     name: End-to-end on kind
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4
         with:
@@ -93,33 +93,42 @@ jobs:
         id: fixtures
         uses: actions/cache@v4
         with:
-          path: testdata/node1/disk1
-          key: fixtures-${{ steps.testdata.outputs.sha }}-${{ hashFiles('testdata/create_mkv.sh') }}
+          path: |
+            testdata/node1/disk1
+            testdata/podcast-feed
+          key: fixtures-${{ steps.testdata.outputs.sha }}-${{ hashFiles('testdata/create_mkv.sh', 'testdata/create_books.sh', 'testdata/create_comics.sh', 'testdata/create_podcast_feed.sh') }}
 
       # Only on a cache miss — which also means ffmpeg is only installed when it is used.
       - name: Generate media fixtures
         if: steps.fixtures.outputs.cache-hit != 'true'
         run: |
-          sudo apt-get update && sudo apt-get install -y ffmpeg
+          sudo apt-get update && sudo apt-get install -y ffmpeg zip
           cd testdata
-          # create_mkv.sh walks every node*/disk* it finds and encodes a 3-minute video per
-          # episode. The e2e only mounts node1/disk1/{tv,movies}, so drop the rest rather
+          # The generators walk every node*/disk* they find and encode a 3-minute video per
+          # episode. The e2e only mounts node1/disk1, so drop the other nodes/disks rather
           # than spend minutes encoding video nothing will ever read.
-          rm -rf node2 node1/disk2 node1/disk1/music node1/disk1/books
-          # create_mkv.sh's exit status is simply that of its last statement — a bare
-          # `[ -d node1/disk1/music ] && create_music_structure …` test that we force false
-          # by removing music above, so the script exits 1 even on a full success. It also
-          # runs without `set -e`, so its exit code is no reliable success signal anyway.
-          # Ignore it and gate on the fixtures that actually got produced instead.
+          rm -rf node2 node1/disk2
+          # create_mkv.sh runs without `set -e` and its exit status is simply that of its
+          # last statement, so its exit code is no reliable success signal. Ignore it and
+          # gate on the fixtures that actually got produced instead.
           ./create_mkv.sh || true
+          ./create_books.sh
+          ./create_comics.sh
+          # The feed is served in-cluster by ci/podcast-feed.yaml under this name.
+          ./create_podcast_feed.sh http://podcast-feed:8080
           count=$(find node1/disk1 -name '*.mkv' | wc -l)
           echo "generated $count mkv fixtures"
           [ "$count" -gt 0 ]
+          [ -f podcast-feed/feed.xml ]
+          [ "$(find node1/disk1/books -name '*.epub' | wc -l)" -gt 0 ]
+          [ "$(find node1/disk1/comics -name '*.cbz' | wc -l)" -gt 0 ]
 
       - name: Show the fixtures
         run: |
           echo "cache hit: ${{ steps.fixtures.outputs.cache-hit == 'true' }}"
-          echo "mkv files: $(find testdata/node1/disk1 -name '*.mkv' | wc -l)"
+          echo "mkv files:  $(find testdata/node1/disk1 -name '*.mkv' | wc -l)"
+          echo "epub files: $(find testdata/node1/disk1 -name '*.epub' | wc -l)"
+          echo "cbz files:  $(find testdata/node1/disk1 -name '*.cbz' | wc -l)"
 
       - uses: azure/setup-helm@v4
         with:
@@ -142,11 +151,13 @@ jobs:
           config: chart/ci/kind-config.yaml
           cluster_name: ister
 
-      - name: Deploy the mock OIDC issuer
+      - name: Deploy the mock OIDC issuer, podcast feed server and external-API mock
         run: |
           kubectl create namespace ister
           kubectl apply -n ister -f chart/ci/mock-oidc.yaml
-          kubectl wait -n ister --for=condition=Available deploy/mock-oidc --timeout=120s
+          kubectl apply -n ister -f chart/ci/podcast-feed.yaml
+          kubectl apply -n ister -f chart/ci/mock-external.yaml
+          kubectl wait -n ister --for=condition=Available deploy/mock-oidc deploy/podcast-feed deploy/mock-external --timeout=180s
 
       - name: Install the chart
         working-directory: chart

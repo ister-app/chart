@@ -114,7 +114,7 @@ server:
     existingClaim: ""
 
   # Media libraries. Each maps to APP_ISTER_DISK_LIBRARIES_<i>_*.
-  # type: SHOW | MOVIE | MUSIC | BOOK | PODCAST
+  # type: SHOW | MOVIE | MUSIC | BOOK | PODCAST | COMIC
   libraries: []
   # - name: shows
   #   type: SHOW

@@ -1,0 +1,66 @@
+# A static file server for the generated podcast feed. NOT part of the chart — CI
+# infrastructure only.
+#
+# testdata/create_podcast_feed.sh must be run with base URL http://podcast-feed:8080
+# BEFORE the kind cluster is created, so the feed's enclosure/image URLs resolve to
+# this Service from inside the cluster. The generated podcast-feed/ directory reaches
+# the kind node through the same ./testdata extraMount as the media libraries
+# (ci/kind-config.yaml).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: podcast-feed
+  labels:
+    app: podcast-feed
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: podcast-feed
+  template:
+    metadata:
+      labels:
+        app: podcast-feed
+    spec:
+      containers:
+        - name: http-server
+          image: python:3.13-alpine
+          command: ["python3", "-m", "http.server", "8080", "--directory", "/feed"]
+          ports:
+            - name: http
+              containerPort: 8080
+          volumeMounts:
+            - name: feed
+              mountPath: /feed
+              readOnly: true
+          readinessProbe:
+            httpGet:
+              path: /feed.xml
+              port: http
+            initialDelaySeconds: 2
+            periodSeconds: 3
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              memory: 128Mi
+      volumes:
+        - name: feed
+          hostPath:
+            path: /testdata/podcast-feed
+            type: Directory
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: podcast-feed
+  labels:
+    app: podcast-feed
+spec:
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+  selector:
+    app: podcast-feed

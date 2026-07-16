@@ -1,0 +1,400 @@
+# A WireMock stand-in for every external metadata source. NOT part of the chart — CI
+# infrastructure only.
+#
+# The server's metadata workers call TMDB, MusicBrainz, Cover Art Archive, Open Library,
+# Wikidata/Wikipedia, Wikimedia Commons and iTunes. In CI those would need internet and a
+# real TMDB key, and would be flaky and rate-limited. All their base URLs are configurable
+# (see server.extraEnv in ci/values-ci.yaml), so this one pod serves them all, each under
+# its own path prefix:
+#
+#   /tmdb/...        TMDB API           /musicbrainz/...  MusicBrainz
+#   /openlibrary/... Open Library       /wikidata/...     Wikidata entity + api
+#   /wikipedia/...   Wikipedia summary  /itunes/...       iTunes podcast directory
+#   /img/...         every image download (returns a real JPEG)
+#
+# The stubs are fixture-aware where a handler verifies the result title against the
+# scanned name (search responses echo the query via response templating), and canned
+# everywhere else. Stubs return "no results" as the safe default so unforeseen calls
+# skip cleanly instead of dead-lettering.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mock-external-mappings
+data:
+  tmdb-search-movie.json: |
+    {
+      "request": {"method": "GET", "urlPathPattern": "/tmdb/3/search/movie"},
+      "response": {
+        "status": 200,
+        "headers": {"Content-Type": "application/json"},
+        "body": "{\"results\":[{\"id\":101,\"title\":\"{{request.query.query}}\",\"original_title\":\"{{request.query.query}}\",\"popularity\":50.0}]}",
+        "transformers": ["response-template"]
+      }
+    }
+  tmdb-movie-details.json: |
+    {
+      "request": {"method": "GET", "urlPathPattern": "/tmdb/3/movie/[0-9]+"},
+      "response": {
+        "status": 200,
+        "headers": {"Content-Type": "application/json"},
+        "jsonBody": {"id": 101, "title": "Tiger", "overview": "A mock movie overview.", "release_date": "2011-05-14", "poster_path": "/movie-poster.jpg", "backdrop_path": "/movie-backdrop.jpg"}
+      }
+    }
+  tmdb-movie-credits.json: |
+    {
+      "request": {"method": "GET", "urlPathPattern": "/tmdb/3/movie/[0-9]+/credits"},
+      "response": {
+        "status": 200,
+        "headers": {"Content-Type": "application/json"},
+        "jsonBody": {"cast": [{"id": 301, "name": "Mock Actor", "profile_path": "/actor.jpg", "character": "Lead", "order": 0, "credit_id": "credit-1"}]}
+      }
+    }
+  tmdb-search-tv.json: |
+    {
+      "request": {"method": "GET", "urlPathPattern": "/tmdb/3/search/tv"},
+      "response": {
+        "status": 200,
+        "headers": {"Content-Type": "application/json"},
+        "body": "{\"results\":[{\"id\":201,\"name\":\"{{request.query.query}}\",\"original_name\":\"{{request.query.query}}\",\"popularity\":50.0}]}",
+        "transformers": ["response-template"]
+      }
+    }
+  tmdb-tv-details.json: |
+    {
+      "request": {"method": "GET", "urlPathPattern": "/tmdb/3/tv/[0-9]+"},
+      "response": {
+        "status": 200,
+        "headers": {"Content-Type": "application/json"},
+        "jsonBody": {"id": 201, "name": "Mock Show", "overview": "A mock show overview.", "first_air_date": "2015-06-01", "poster_path": "/show-poster.jpg", "backdrop_path": "/show-backdrop.jpg"}
+      }
+    }
+  tmdb-tv-aggregate-credits.json: |
+    {
+      "request": {"method": "GET", "urlPathPattern": "/tmdb/3/tv/[0-9]+/aggregate_credits"},
+      "response": {
+        "status": 200,
+        "headers": {"Content-Type": "application/json"},
+        "jsonBody": {"cast": [{"id": 302, "name": "Mock Tv Actor", "profile_path": "/tv-actor.jpg", "order": 0, "roles": [{"character": "Self", "credit_id": "credit-2"}]}]}
+      }
+    }
+  tmdb-episode-details.json: |
+    {
+      "request": {"method": "GET", "urlPathPattern": "/tmdb/3/tv/[0-9]+/season/[0-9]+/episode/[0-9]+"},
+      "response": {
+        "status": 200,
+        "headers": {"Content-Type": "application/json"},
+        "body": "{\"id\":401,\"name\":\"Mock Episode {{request.path.[7]}}\",\"episode_number\":{{request.path.[7]}},\"overview\":\"A mock episode overview.\",\"air_date\":\"2015-06-01\",\"still_path\":\"/episode-still.jpg\"}",
+        "transformers": ["response-template"]
+      }
+    }
+  tmdb-episode-credits.json: |
+    {
+      "request": {"method": "GET", "urlPathPattern": "/tmdb/3/tv/[0-9]+/season/[0-9]+/episode/[0-9]+/credits"},
+      "response": {
+        "status": 200,
+        "headers": {"Content-Type": "application/json"},
+        "jsonBody": {"cast": [], "guest_stars": []}
+      }
+    }
+  tmdb-person-details.json: |
+    {
+      "request": {"method": "GET", "urlPathPattern": "/tmdb/3/person/[0-9]+"},
+      "response": {
+        "status": 200,
+        "headers": {"Content-Type": "application/json"},
+        "jsonBody": {"birthday": "1970-01-01"}
+      }
+    }
+  tmdb-search-catchall.json: |
+    {
+      "priority": 9,
+      "request": {"method": "GET", "urlPathPattern": "/tmdb/3/search/.*"},
+      "response": {
+        "status": 200,
+        "headers": {"Content-Type": "application/json"},
+        "jsonBody": {"results": []}
+      }
+    }
+  musicbrainz-artist-search.json: |
+    {
+      "request": {
+        "method": "GET",
+        "urlPathPattern": "/musicbrainz/artist",
+        "queryParameters": {"query": {"contains": "Wolves"}}
+      },
+      "response": {
+        "status": 200,
+        "headers": {"Content-Type": "application/json"},
+        "jsonBody": {"artists": [{"id": "mb-artist-1", "name": "Wolves", "type": "Group", "life-span": {"begin": "2001"}, "tags": [{"name": "rock"}]}]}
+      }
+    }
+  musicbrainz-artist-lookup.json: |
+    {
+      "request": {"method": "GET", "urlPathPattern": "/musicbrainz/artist/[^/]+"},
+      "response": {
+        "status": 200,
+        "headers": {"Content-Type": "application/json"},
+        "jsonBody": {"annotation": {"text": "A mock artist annotation."}, "tags": [{"name": "rock"}], "relations": [{"type": "image", "url": {"resource": "https://commons.wikimedia.org/wiki/File:Wolves.jpg"}}, {"type": "wikidata", "url": {"resource": "https://www.wikidata.org/wiki/Q901"}}]}
+      }
+    }
+  musicbrainz-releasegroup-howling.json: |
+    {
+      "request": {
+        "method": "GET",
+        "urlPathPattern": "/musicbrainz/release-group",
+        "queryParameters": {"query": {"contains": "Howling"}, "inc": {"absent": true}}
+      },
+      "response": {
+        "status": 200,
+        "headers": {"Content-Type": "application/json"},
+        "jsonBody": {"release-groups": [{"id": "rg-howling", "title": "Howling"}]}
+      }
+    }
+  musicbrainz-releasegroup-running.json: |
+    {
+      "request": {
+        "method": "GET",
+        "urlPathPattern": "/musicbrainz/release-group",
+        "queryParameters": {"query": {"contains": "Running"}, "inc": {"absent": true}}
+      },
+      "response": {
+        "status": 200,
+        "headers": {"Content-Type": "application/json"},
+        "jsonBody": {"release-groups": [{"id": "rg-running", "title": "Running"}]}
+      }
+    }
+  musicbrainz-releasegroup-annotation.json: |
+    {
+      "request": {
+        "method": "GET",
+        "urlPathPattern": "/musicbrainz/release-group",
+        "queryParameters": {"inc": {"equalTo": "annotation"}}
+      },
+      "response": {
+        "status": 200,
+        "headers": {"Content-Type": "application/json"},
+        "jsonBody": {"release-groups": [{"annotation": {"text": "A mock album annotation."}}]}
+      }
+    }
+  musicbrainz-catchall.json: |
+    {
+      "priority": 9,
+      "request": {"method": "GET", "urlPathPattern": "/musicbrainz/.*"},
+      "response": {
+        "status": 200,
+        "headers": {"Content-Type": "application/json"},
+        "jsonBody": {"artists": [], "release-groups": [], "releases": []}
+      }
+    }
+  openlibrary-search-title.json: |
+    {
+      "request": {
+        "method": "GET",
+        "urlPathPattern": "/openlibrary/search.json",
+        "queryParameters": {"title": {"matches": ".+"}}
+      },
+      "response": {
+        "status": 200,
+        "headers": {"Content-Type": "application/json"},
+        "body": "{\"docs\":[{\"key\":\"/works/OLW1\",\"title\":\"{{request.query.title}}\",\"cover_i\":777,\"first_publish_year\":1950}]}",
+        "transformers": ["response-template"]
+      }
+    }
+  openlibrary-search-isbn.json: |
+    {
+      "request": {
+        "method": "GET",
+        "urlPathPattern": "/openlibrary/search.json",
+        "queryParameters": {"q": {"matches": "isbn:.*"}}
+      },
+      "response": {
+        "status": 200,
+        "headers": {"Content-Type": "application/json"},
+        "jsonBody": {"docs": [{"key": "/works/OLW1", "cover_i": 777, "first_publish_year": 1950}]}
+      }
+    }
+  openlibrary-work.json: |
+    {
+      "request": {"method": "GET", "urlPathPattern": "/openlibrary/works/.*\\.json"},
+      "response": {
+        "status": 200,
+        "headers": {"Content-Type": "application/json"},
+        "jsonBody": {"description": "A mock book description."}
+      }
+    }
+  openlibrary-author-search.json: |
+    {
+      "request": {"method": "GET", "urlPathPattern": "/openlibrary/search/authors.json"},
+      "response": {
+        "status": 200,
+        "headers": {"Content-Type": "application/json"},
+        "body": "{\"docs\":[{\"key\":\"OLA1\",\"name\":\"{{request.query.q}}\"}]}",
+        "transformers": ["response-template"]
+      }
+    }
+  openlibrary-author.json: |
+    {
+      "request": {"method": "GET", "urlPathPattern": "/openlibrary/authors/.*\\.json"},
+      "response": {
+        "status": 200,
+        "headers": {"Content-Type": "application/json"},
+        "jsonBody": {"bio": "A mock author bio.", "birth_date": "1950", "photos": [123], "remote_ids": {"wikidata": "Q902"}}
+      }
+    }
+  wikidata-search-falcon.json: |
+    {
+      "request": {
+        "method": "GET",
+        "urlPathPattern": "/wikidata/api",
+        "queryParameters": {"search": {"contains": "Falcon"}}
+      },
+      "response": {
+        "status": 200,
+        "headers": {"Content-Type": "application/json"},
+        "jsonBody": {"search": [{"id": "Q911"}]}
+      }
+    }
+  wikidata-search-badger.json: |
+    {
+      "request": {
+        "method": "GET",
+        "urlPathPattern": "/wikidata/api",
+        "queryParameters": {"search": {"contains": "Badger"}}
+      },
+      "response": {
+        "status": 200,
+        "headers": {"Content-Type": "application/json"},
+        "jsonBody": {"search": [{"id": "Q912"}]}
+      }
+    }
+  wikidata-search-catchall.json: |
+    {
+      "priority": 9,
+      "request": {"method": "GET", "urlPathPattern": "/wikidata/api"},
+      "response": {
+        "status": 200,
+        "headers": {"Content-Type": "application/json"},
+        "jsonBody": {"search": []}
+      }
+    }
+  wikidata-entity-q901.json: |
+    {
+      "request": {"method": "GET", "urlPathPattern": "/wikidata/entity/Q901\\.json"},
+      "response": {
+        "status": 200,
+        "headers": {"Content-Type": "application/json"},
+        "jsonBody": {"entities": {"Q901": {"sitelinks": {"enwiki": {"title": "Wolves (band)"}, "nlwiki": {"title": "Wolves (band)"}}}}}
+      }
+    }
+  wikidata-entity-q902.json: |
+    {
+      "request": {"method": "GET", "urlPathPattern": "/wikidata/entity/Q902\\.json"},
+      "response": {
+        "status": 200,
+        "headers": {"Content-Type": "application/json"},
+        "jsonBody": {"entities": {"Q902": {"sitelinks": {"enwiki": {"title": "Mock Author"}, "nlwiki": {"title": "Mock Author"}}}}}
+      }
+    }
+  wikidata-entity-q911.json: |
+    {
+      "request": {"method": "GET", "urlPathPattern": "/wikidata/entity/Q911\\.json"},
+      "response": {
+        "status": 200,
+        "headers": {"Content-Type": "application/json"},
+        "jsonBody": {"entities": {"Q911": {"claims": {"P31": [{"mainsnak": {"datavalue": {"value": {"id": "Q14406742"}}}}]}, "labels": {"en": {"value": "Falcon"}, "nl": {"value": "Falcon"}}, "sitelinks": {"enwiki": {"title": "Falcon (comics)"}, "nlwiki": {"title": "Falcon (strip)"}}}}}
+      }
+    }
+  wikidata-entity-q912.json: |
+    {
+      "request": {"method": "GET", "urlPathPattern": "/wikidata/entity/Q912\\.json"},
+      "response": {
+        "status": 200,
+        "headers": {"Content-Type": "application/json"},
+        "jsonBody": {"entities": {"Q912": {"claims": {"P31": [{"mainsnak": {"datavalue": {"value": {"id": "Q14406742"}}}}]}, "labels": {"en": {"value": "Badger"}, "nl": {"value": "Badger"}}, "sitelinks": {"enwiki": {"title": "Badger (comics)"}, "nlwiki": {"title": "Badger (strip)"}}}}}
+      }
+    }
+  wikipedia-summary.json: |
+    {
+      "request": {"method": "GET", "urlPathPattern": "/wikipedia/[^/]+/summary/.*"},
+      "response": {
+        "status": 200,
+        "headers": {"Content-Type": "application/json"},
+        "jsonBody": {"extract": "A mock Wikipedia summary.", "thumbnail": {"source": "http://mock-external:8080/img/wiki/thumb.jpg"}}
+      }
+    }
+  itunes-search.json: |
+    {
+      "request": {"method": "GET", "urlPathPattern": "/itunes/search"},
+      "response": {
+        "status": 200,
+        "headers": {"Content-Type": "application/json"},
+        "jsonBody": {"results": [{"collectionName": "Ister Test Cast", "artistName": "Ister Testdata", "feedUrl": "http://podcast-feed:8080/feed.xml", "artworkUrl600": "http://mock-external:8080/img/itunes/artwork.jpg"}]}
+      }
+    }
+  images.json: |
+    {
+      "request": {"method": "GET", "urlPathPattern": "/img/.*"},
+      "response": {
+        "status": 200,
+        "headers": {"Content-Type": "image/jpeg"},
+        "base64Body": "/9j/4AAQSkZJRgABAgAAAQABAAD//gAQTGF2YzYyLjI4LjEwMgD/2wBDAAgKCgsKCw0NDQ0NDRAPEBAQEBAQEBAQEBASEhIVFRUSEhIQEBISFBQVFRcXFxUVFRUXFxkZGR4eHBwjIyQrKzP/xABMAAEBAAAAAAAAAAAAAAAAAAAABwEBAQAAAAAAAAAAAAAAAAAAAAYQAQAAAAAAAAAAAAAAAAAAAAARAQAAAAAAAAAAAAAAAAAAAAD/wAARCABgAEADASIAAhEAAxEA/9oADAMBAAIRAxEAPwCZgKpagAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAP/2Q=="
+      }
+    }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mock-external
+  labels:
+    app: mock-external
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mock-external
+  template:
+    metadata:
+      labels:
+        app: mock-external
+    spec:
+      containers:
+        - name: wiremock
+          image: wiremock/wiremock:3.13.1
+          args: ["--port", "8080", "--global-response-templating", "--disable-banner"]
+          ports:
+            - name: http
+              containerPort: 8080
+          volumeMounts:
+            - name: mappings
+              mountPath: /home/wiremock/mappings
+              readOnly: true
+          readinessProbe:
+            httpGet:
+              path: /__admin/health
+              port: http
+            initialDelaySeconds: 2
+            periodSeconds: 3
+          resources:
+            requests:
+              cpu: 25m
+              memory: 256Mi
+            limits:
+              memory: 512Mi
+      volumes:
+        - name: mappings
+          configMap:
+            name: mock-external-mappings
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mock-external
+  labels:
+    app: mock-external
+spec:
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+  selector:
+    app: mock-external
