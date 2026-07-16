@@ -180,8 +180,11 @@ spec:
                 secretKeyRef:
                   name: {{ include "ister.serverSecretName" . }}
                   key: tmdb-api-key
+            # The server joins cache paths by plain concatenation (its own default is
+            # "/cache/"), so this env value needs the trailing slash the mountPath must
+            # not have — without it image downloads try to write to e.g. /cacheXXX.jpg.
             - name: CACHE_DIR
-              value: {{ .Values.cache.mountPath | quote }}
+              value: {{ printf "%s/" (.Values.cache.mountPath | trimSuffix "/") | quote }}
             - name: TMP_DIR
               value: {{ .Values.server.tmp.mountPath | quote }}
             # --- Media libraries and directories (bound by @ConfigurationProperties("app.ister.disk"))
