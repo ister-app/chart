@@ -67,6 +67,11 @@ jobs:
         with:
           args: -strict -summary -ignore-missing-schemas kubeconform-manifests.yaml
 
+      # Catches a broken VALUES marker or values.yaml drift on the PR instead of
+      # letting it fail the release build.
+      - name: Build the docs zip
+        run: ./ci/build-docs.sh 0.0.0-ci
+
   e2e:
     name: End-to-end on kind
     runs-on: ubuntu-latest

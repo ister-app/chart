@@ -12,6 +12,8 @@ on:
       - values.yaml
       - values.schema.json
       - templates/**
+      # The docs ship as a zip on every release, so a doc change must release too.
+      - doc/**
   workflow_dispatch:
     inputs:
       bump:
@@ -104,6 +106,11 @@ jobs:
       - name: Generate release notes
         run: ./ci/release-notes.sh "${{ steps.version.outputs.version }}" "${{ steps.version.outputs.prev }}"
 
+      # doc/ with the values reference filled in from values.yaml; attached to the
+      # release below, mirroring the player repo's docs zip.
+      - name: Build the docs zip
+        run: ./ci/build-docs.sh "${{ steps.version.outputs.version }}"
+
       - name: Package
         run: |
           helm dependency build
@@ -133,6 +140,6 @@ jobs:
           git tag -a "v${VERSION}" -m "v${VERSION}"
           git push origin HEAD:main --follow-tags
 
-          gh release create "v${VERSION}" "ister-${VERSION}.tgz" \
+          gh release create "v${VERSION}" "ister-${VERSION}.tgz" "ister-chart-docs-${VERSION}.zip" \
             --title "v${VERSION}" \
             --notes-file RELEASE_NOTES.md

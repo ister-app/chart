@@ -19,6 +19,7 @@ helm template ister . -f ci/values-ci.yaml             # values.schema.json is e
 helm package .
 
 ci/release-notes.sh 0.3.0 v0.2.0 && cat RELEASE_NOTES.md   # release notes, runs locally
+ci/build-docs.sh 0.0.0-local                               # the docs zip, runs locally
 ```
 
 There are four value profiles and CI renders all of them; a change to `values.yaml` or a template
@@ -96,6 +97,12 @@ Automatic, and the details matter before you touch `Chart.yaml`:
   of truth. `ci/release-notes.sh` mirrors that fallback so the migrations row is never blank.
 - Renovate (`renovate.json`), not Dependabot — Dependabot's docker manager cannot tell two images
   in one `values.yaml` apart when they share a tag string (dependabot-core#6891).
+- Every release also ships `ister-chart-docs-<version>.zip`, built by `ci/build-docs.sh` from
+  `doc/admin/{en,nl}/` (the player repo's `doc/` layout). The values reference in each chapter is
+  an **empty `VALUES:BEGIN`/`VALUES:END` marker pair in git** that the script fills from
+  `values.yaml` at build time — never commit content between the markers, and never spell the
+  literal markers out anywhere else in `doc/` (the script fills every pair it finds). `doc/` is
+  `.helmignore`d, so it never ends up in the chart tgz; a `doc/**` change does trigger a release.
 
 `server` and `player` publish semver tags: `values.yaml` pins both at `1.0.0` and Renovate bumps
 them from there. `migrations` has no `tag` of its own — see the appVersion note above.

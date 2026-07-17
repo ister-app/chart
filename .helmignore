@@ -16,3 +16,7 @@ values-production.yaml
 # CI scaffolding is not part of the chart.
 .github/
 ci/
+
+# Documentation ships as a release-asset zip (ci/build-docs.sh), not inside the chart.
+doc/
+ister-chart-docs-*.zip

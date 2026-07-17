@@ -13,5 +13,8 @@ charts/
 *.tgz
 RELEASE_NOTES.md
 
+# Built by ci/build-docs.sh; attached to the GitHub Release, never committed.
+ister-chart-docs-*.zip
+
 # Rendered manifests the CI kubeconform step feeds to the container.
 kubeconform-manifests.yaml
