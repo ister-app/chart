@@ -1,5 +1,28 @@
 # Changelog
 
+## ister-chart v0.3.1
+
+| Component | Image | Version |
+|---|---|---|
+| server | `ghcr.io/ister-app/server` | 2.0.1 |
+| website | `ghcr.io/ister-app/player` | 1.0.0 |
+| migrations | `ghcr.io/ister-app/migrations` | 2.0.1 |
+| database | `postgres` | 18 |
+| typesense | `docker.io/typesense/typesense` | 30.2 |
+| rabbitmq | subchart `bitnamicharts/rabbitmq` | 16.0.14 |
+
+### Dependency updates
+
+- fix(deps): bump the server (and with it migrations) to 2.0.1 ([`fdfec34`](https://github.com/ister-app/chart/commit/fdfec34))
+
+### Install
+
+```sh
+helm install ister oci://ghcr.io/ister-app/charts/ister --version 0.3.1
+```
+
+**Full changelog**: https://github.com/ister-app/chart/compare/v0.3.0...v0.3.1
+
 ## ister-chart v0.3.0
 
 | Component | Image | Version |
