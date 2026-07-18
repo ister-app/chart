@@ -12,33 +12,673 @@
 #   /wikipedia/...   Wikipedia summary  /itunes/...       iTunes podcast directory
 #   /img/...         every image download (returns a real JPEG)
 #
-# The stubs are fixture-aware where a handler verifies the result title against the
-# scanned name (search responses echo the query via response templating), and canned
-# everywhere else. Stubs return "no results" as the safe default so unforeseen calls
-# skip cleanly instead of dead-lettering.
+# The stubs are fixture-aware: every movie/show/book fixture has its own search +
+# details stub pair carrying the real title and the .nfo plot, so enriched metadata
+# reads like real media (screenshots included) while staying fully offline. Search
+# catchalls return "no results" as the safe default so unforeseen calls skip
+# cleanly instead of dead-lettering — a new fixture therefore needs a new stub pair.
 apiVersion: v1
 kind: ConfigMap
 metadata:
   name: mock-external-mappings
 data:
-  tmdb-search-movie.json: |
+  # One search + one details stub per movie fixture. The search query is the bare
+  # scanned name (the year travels as primary_release_year), and a single-result
+  # response is accepted without a title check, so equalTo on the name is enough.
+  # Details must carry release_date AND overview or the worker discards the result.
+  # The titles/overviews mirror the fixture .nfo files, so screenshots and e2e data
+  # read like real media. A new movie fixture needs a new stub pair here: the
+  # search catchall below returns no results, and without TMDB enrichment a movie
+  # is skipped (on servers without movie-nfo scanning it then never reaches the
+  # search index either).
+  tmdb-fixture-movies.json: |
     {
-      "request": {"method": "GET", "urlPathPattern": "/tmdb/3/search/movie"},
-      "response": {
-        "status": 200,
-        "headers": {"Content-Type": "application/json"},
-        "body": "{\"results\":[{\"id\":101,\"title\":\"{{request.query.query}}\",\"original_title\":\"{{request.query.query}}\",\"popularity\":50.0}]}",
-        "transformers": ["response-template"]
-      }
+      "mappings": [
+        {
+          "request": {
+            "method": "GET",
+            "urlPathPattern": "/tmdb/3/search/movie",
+            "queryParameters": {
+              "query": {
+                "equalTo": "Tiger"
+              }
+            }
+          },
+          "response": {
+            "status": 200,
+            "headers": {
+              "Content-Type": "application/json"
+            },
+            "jsonBody": {
+              "results": [
+                {
+                  "id": 101,
+                  "title": "Tiger",
+                  "original_title": "Tiger",
+                  "popularity": 50.0
+                }
+              ]
+            }
+          }
+        },
+        {
+          "request": {
+            "method": "GET",
+            "urlPathPattern": "/tmdb/3/movie/101"
+          },
+          "response": {
+            "status": 200,
+            "headers": {
+              "Content-Type": "application/json"
+            },
+            "jsonBody": {
+              "id": 101,
+              "title": "Tiger",
+              "overview": "A wildlife photographer ventures deep into the jungles of India to document the life of a rare Bengal tiger and its struggle for survival.",
+              "release_date": "2011-05-14",
+              "poster_path": "/movie-poster.jpg",
+              "backdrop_path": "/movie-backdrop.jpg"
+            }
+          }
+        },
+        {
+          "request": {
+            "method": "GET",
+            "urlPathPattern": "/tmdb/3/search/movie",
+            "queryParameters": {
+              "query": {
+                "equalTo": "Monkey"
+              }
+            }
+          },
+          "response": {
+            "status": 200,
+            "headers": {
+              "Content-Type": "application/json"
+            },
+            "jsonBody": {
+              "results": [
+                {
+                  "id": 102,
+                  "title": "Monkey",
+                  "original_title": "Monkey",
+                  "popularity": 50.0
+                }
+              ]
+            }
+          }
+        },
+        {
+          "request": {
+            "method": "GET",
+            "urlPathPattern": "/tmdb/3/movie/102"
+          },
+          "response": {
+            "status": 200,
+            "headers": {
+              "Content-Type": "application/json"
+            },
+            "jsonBody": {
+              "id": 102,
+              "title": "Monkey",
+              "overview": "A young orphaned monkey finds an unlikely companion in a lonely park ranger as the two navigate the challenges of the wild together.",
+              "release_date": "2010-08-20",
+              "poster_path": "/movie-poster.jpg",
+              "backdrop_path": "/movie-backdrop.jpg"
+            }
+          }
+        },
+        {
+          "request": {
+            "method": "GET",
+            "urlPathPattern": "/tmdb/3/search/movie",
+            "queryParameters": {
+              "query": {
+                "equalTo": "Mouse"
+              }
+            }
+          },
+          "response": {
+            "status": 200,
+            "headers": {
+              "Content-Type": "application/json"
+            },
+            "jsonBody": {
+              "results": [
+                {
+                  "id": 103,
+                  "title": "Mouse",
+                  "original_title": "Mouse",
+                  "popularity": 50.0
+                }
+              ]
+            }
+          }
+        },
+        {
+          "request": {
+            "method": "GET",
+            "urlPathPattern": "/tmdb/3/movie/103"
+          },
+          "response": {
+            "status": 200,
+            "headers": {
+              "Content-Type": "application/json"
+            },
+            "jsonBody": {
+              "id": 103,
+              "title": "Mouse",
+              "overview": "A tiny house mouse embarks on an epic adventure across the city to reunite with her family after being separated during a storm.",
+              "release_date": "2020-11-06",
+              "poster_path": "/movie-poster.jpg",
+              "backdrop_path": "/movie-backdrop.jpg"
+            }
+          }
+        },
+        {
+          "request": {
+            "method": "GET",
+            "urlPathPattern": "/tmdb/3/search/movie",
+            "queryParameters": {
+              "query": {
+                "equalTo": "Bats"
+              }
+            }
+          },
+          "response": {
+            "status": 200,
+            "headers": {
+              "Content-Type": "application/json"
+            },
+            "jsonBody": {
+              "results": [
+                {
+                  "id": 104,
+                  "title": "Bats",
+                  "original_title": "Bats",
+                  "popularity": 50.0
+                }
+              ]
+            }
+          }
+        },
+        {
+          "request": {
+            "method": "GET",
+            "urlPathPattern": "/tmdb/3/movie/104"
+          },
+          "response": {
+            "status": 200,
+            "headers": {
+              "Content-Type": "application/json"
+            },
+            "jsonBody": {
+              "id": 104,
+              "title": "Bats",
+              "overview": "A cave biologist discovers a colony of bats with extraordinary echolocation abilities that may hold the key to a new navigation technology.",
+              "release_date": "2021-03-19",
+              "poster_path": "/movie-poster.jpg",
+              "backdrop_path": "/movie-backdrop.jpg"
+            }
+          }
+        },
+        {
+          "request": {
+            "method": "GET",
+            "urlPathPattern": "/tmdb/3/search/movie",
+            "queryParameters": {
+              "query": {
+                "equalTo": "Cats"
+              }
+            }
+          },
+          "response": {
+            "status": 200,
+            "headers": {
+              "Content-Type": "application/json"
+            },
+            "jsonBody": {
+              "results": [
+                {
+                  "id": 105,
+                  "title": "Cats",
+                  "original_title": "Cats",
+                  "popularity": 50.0
+                }
+              ]
+            }
+          }
+        },
+        {
+          "request": {
+            "method": "GET",
+            "urlPathPattern": "/tmdb/3/movie/105"
+          },
+          "response": {
+            "status": 200,
+            "headers": {
+              "Content-Type": "application/json"
+            },
+            "jsonBody": {
+              "id": 105,
+              "title": "Cats",
+              "overview": "In a sprawling metropolis, a colony of stray cats forms an unlikely alliance to protect their neighborhood from a ruthless developer.",
+              "release_date": "2024-02-09",
+              "poster_path": "/movie-poster.jpg",
+              "backdrop_path": "/movie-backdrop.jpg"
+            }
+          }
+        },
+        {
+          "request": {
+            "method": "GET",
+            "urlPathPattern": "/tmdb/3/search/movie",
+            "queryParameters": {
+              "query": {
+                "equalTo": "Dog"
+              }
+            }
+          },
+          "response": {
+            "status": 200,
+            "headers": {
+              "Content-Type": "application/json"
+            },
+            "jsonBody": {
+              "results": [
+                {
+                  "id": 106,
+                  "title": "Dog",
+                  "original_title": "Dog",
+                  "popularity": 50.0
+                }
+              ]
+            }
+          }
+        },
+        {
+          "request": {
+            "method": "GET",
+            "urlPathPattern": "/tmdb/3/movie/106"
+          },
+          "response": {
+            "status": 200,
+            "headers": {
+              "Content-Type": "application/json"
+            },
+            "jsonBody": {
+              "id": 106,
+              "title": "Dog",
+              "overview": "A retired soldier and his loyal service dog embark on a road trip across the country to attend the funeral of a fellow handler.",
+              "release_date": "2023-07-14",
+              "poster_path": "/movie-poster.jpg",
+              "backdrop_path": "/movie-backdrop.jpg"
+            }
+          }
+        },
+        {
+          "request": {
+            "method": "GET",
+            "urlPathPattern": "/tmdb/3/search/movie",
+            "queryParameters": {
+              "query": {
+                "equalTo": "Gorilla"
+              }
+            }
+          },
+          "response": {
+            "status": 200,
+            "headers": {
+              "Content-Type": "application/json"
+            },
+            "jsonBody": {
+              "results": [
+                {
+                  "id": 107,
+                  "title": "Gorilla",
+                  "original_title": "Gorilla",
+                  "popularity": 50.0
+                }
+              ]
+            }
+          }
+        },
+        {
+          "request": {
+            "method": "GET",
+            "urlPathPattern": "/tmdb/3/movie/107"
+          },
+          "response": {
+            "status": 200,
+            "headers": {
+              "Content-Type": "application/json"
+            },
+            "jsonBody": {
+              "id": 107,
+              "title": "Gorilla",
+              "overview": "A primatologist dedicates her life to protecting a family of mountain gorillas threatened by poachers in the forests of central Africa.",
+              "release_date": "2012-09-28",
+              "poster_path": "/movie-poster.jpg",
+              "backdrop_path": "/movie-backdrop.jpg"
+            }
+          }
+        },
+        {
+          "request": {
+            "method": "GET",
+            "urlPathPattern": "/tmdb/3/search/movie",
+            "queryParameters": {
+              "query": {
+                "equalTo": "Horses"
+              }
+            }
+          },
+          "response": {
+            "status": 200,
+            "headers": {
+              "Content-Type": "application/json"
+            },
+            "jsonBody": {
+              "results": [
+                {
+                  "id": 108,
+                  "title": "Horses",
+                  "original_title": "Horses",
+                  "popularity": 50.0
+                }
+              ]
+            }
+          }
+        },
+        {
+          "request": {
+            "method": "GET",
+            "urlPathPattern": "/tmdb/3/movie/108"
+          },
+          "response": {
+            "status": 200,
+            "headers": {
+              "Content-Type": "application/json"
+            },
+            "jsonBody": {
+              "id": 108,
+              "title": "Horses",
+              "overview": "On the sweeping plains of Montana, a mustang wrangler fights to preserve a herd of wild horses threatened by encroaching development.",
+              "release_date": "2022-04-01",
+              "poster_path": "/movie-poster.jpg",
+              "backdrop_path": "/movie-backdrop.jpg"
+            }
+          }
+        }
+      ]
     }
-  tmdb-movie-details.json: |
+  # Same pattern for the show fixtures (query + year land on /tmdb/3/search/tv).
+  tmdb-fixture-shows.json: |
     {
-      "request": {"method": "GET", "urlPathPattern": "/tmdb/3/movie/[0-9]+"},
-      "response": {
-        "status": 200,
-        "headers": {"Content-Type": "application/json"},
-        "jsonBody": {"id": 101, "title": "Tiger", "overview": "A mock movie overview.", "release_date": "2011-05-14", "poster_path": "/movie-poster.jpg", "backdrop_path": "/movie-backdrop.jpg"}
-      }
+      "mappings": [
+        {
+          "request": {
+            "method": "GET",
+            "urlPathPattern": "/tmdb/3/search/tv",
+            "queryParameters": {
+              "query": {
+                "equalTo": "Bees"
+              }
+            }
+          },
+          "response": {
+            "status": 200,
+            "headers": {
+              "Content-Type": "application/json"
+            },
+            "jsonBody": {
+              "results": [
+                {
+                  "id": 201,
+                  "name": "Bees",
+                  "original_name": "Bees",
+                  "popularity": 50.0
+                }
+              ]
+            }
+          }
+        },
+        {
+          "request": {
+            "method": "GET",
+            "urlPathPattern": "/tmdb/3/tv/201"
+          },
+          "response": {
+            "status": 200,
+            "headers": {
+              "Content-Type": "application/json"
+            },
+            "jsonBody": {
+              "id": 201,
+              "name": "Bees",
+              "overview": "A nature drama following a colony of bees through five dramatic seasons of survival, cooperation, and discovery.",
+              "first_air_date": "2015-03-10",
+              "poster_path": "/show-poster.jpg",
+              "backdrop_path": "/show-backdrop.jpg"
+            }
+          }
+        },
+        {
+          "request": {
+            "method": "GET",
+            "urlPathPattern": "/tmdb/3/search/tv",
+            "queryParameters": {
+              "query": {
+                "equalTo": "Dragonfly"
+              }
+            }
+          },
+          "response": {
+            "status": 200,
+            "headers": {
+              "Content-Type": "application/json"
+            },
+            "jsonBody": {
+              "results": [
+                {
+                  "id": 202,
+                  "name": "Dragonfly",
+                  "original_name": "Dragonfly",
+                  "popularity": 50.0
+                }
+              ]
+            }
+          }
+        },
+        {
+          "request": {
+            "method": "GET",
+            "urlPathPattern": "/tmdb/3/tv/202"
+          },
+          "response": {
+            "status": 200,
+            "headers": {
+              "Content-Type": "application/json"
+            },
+            "jsonBody": {
+              "id": 202,
+              "name": "Dragonfly",
+              "overview": "A visually stunning series exploring the life cycle and secret world of dragonflies across wetlands and waterways.",
+              "first_air_date": "2020-06-01",
+              "poster_path": "/show-poster.jpg",
+              "backdrop_path": "/show-backdrop.jpg"
+            }
+          }
+        },
+        {
+          "request": {
+            "method": "GET",
+            "urlPathPattern": "/tmdb/3/search/tv",
+            "queryParameters": {
+              "query": {
+                "equalTo": "Butterfly"
+              }
+            }
+          },
+          "response": {
+            "status": 200,
+            "headers": {
+              "Content-Type": "application/json"
+            },
+            "jsonBody": {
+              "results": [
+                {
+                  "id": 203,
+                  "name": "Butterfly",
+                  "original_name": "Butterfly",
+                  "popularity": 50.0
+                }
+              ]
+            }
+          }
+        },
+        {
+          "request": {
+            "method": "GET",
+            "urlPathPattern": "/tmdb/3/tv/203"
+          },
+          "response": {
+            "status": 200,
+            "headers": {
+              "Content-Type": "application/json"
+            },
+            "jsonBody": {
+              "id": 203,
+              "name": "Butterfly",
+              "overview": "An intimate portrait of butterfly migration and metamorphosis, told across five seasons of breathtaking transformation.",
+              "first_air_date": "2010-09-15",
+              "poster_path": "/show-poster.jpg",
+              "backdrop_path": "/show-backdrop.jpg"
+            }
+          }
+        },
+        {
+          "request": {
+            "method": "GET",
+            "urlPathPattern": "/tmdb/3/search/tv",
+            "queryParameters": {
+              "query": {
+                "equalTo": "Ants"
+              }
+            }
+          },
+          "response": {
+            "status": 200,
+            "headers": {
+              "Content-Type": "application/json"
+            },
+            "jsonBody": {
+              "results": [
+                {
+                  "id": 204,
+                  "name": "Ants",
+                  "original_name": "Ants",
+                  "popularity": 50.0
+                }
+              ]
+            }
+          }
+        },
+        {
+          "request": {
+            "method": "GET",
+            "urlPathPattern": "/tmdb/3/tv/204"
+          },
+          "response": {
+            "status": 200,
+            "headers": {
+              "Content-Type": "application/json"
+            },
+            "jsonBody": {
+              "id": 204,
+              "name": "Ants",
+              "overview": "An epic saga of an ant colony battling rivals, weather, and predators across five seasons of underground drama.",
+              "first_air_date": "2005-04-22",
+              "poster_path": "/show-poster.jpg",
+              "backdrop_path": "/show-backdrop.jpg"
+            }
+          }
+        }
+      ]
+    }
+  # One templated stub per show, deliberately without a "name" field: the worker
+  # stores the missing name as a null title, so the UI falls back to the episode's
+  # own .nfo title while the overview still proves enrichment ran. (Returning
+  # "Episode {n}" instead would stick for the nl fetch — the worker only nulls the
+  # language-matching placeholder, "Aflevering %d" for nl.)
+  tmdb-fixture-episodes.json: |
+    {
+      "mappings": [
+        {
+          "request": {
+            "method": "GET",
+            "urlPathPattern": "/tmdb/3/tv/201/season/[0-9]+/episode/[0-9]+"
+          },
+          "response": {
+            "status": 200,
+            "headers": {
+              "Content-Type": "application/json"
+            },
+            "body": "{\"id\":{{request.path.[3]}}{{request.path.[5]}}{{request.path.[7]}},\"episode_number\":{{request.path.[7]}},\"overview\":\"Another day of survival and cooperation inside the colony.\",\"air_date\":\"2015-03-10\",\"still_path\":\"/episode-still.jpg\"}",
+            "transformers": [
+              "response-template"
+            ]
+          }
+        },
+        {
+          "request": {
+            "method": "GET",
+            "urlPathPattern": "/tmdb/3/tv/202/season/[0-9]+/episode/[0-9]+"
+          },
+          "response": {
+            "status": 200,
+            "headers": {
+              "Content-Type": "application/json"
+            },
+            "body": "{\"id\":{{request.path.[3]}}{{request.path.[5]}}{{request.path.[7]}},\"episode_number\":{{request.path.[7]}},\"overview\":\"Life above and below the waterline of the wetlands.\",\"air_date\":\"2020-06-01\",\"still_path\":\"/episode-still.jpg\"}",
+            "transformers": [
+              "response-template"
+            ]
+          }
+        },
+        {
+          "request": {
+            "method": "GET",
+            "urlPathPattern": "/tmdb/3/tv/203/season/[0-9]+/episode/[0-9]+"
+          },
+          "response": {
+            "status": 200,
+            "headers": {
+              "Content-Type": "application/json"
+            },
+            "body": "{\"id\":{{request.path.[3]}}{{request.path.[5]}}{{request.path.[7]}},\"episode_number\":{{request.path.[7]}},\"overview\":\"One more step in a breathtaking transformation.\",\"air_date\":\"2010-09-15\",\"still_path\":\"/episode-still.jpg\"}",
+            "transformers": [
+              "response-template"
+            ]
+          }
+        },
+        {
+          "request": {
+            "method": "GET",
+            "urlPathPattern": "/tmdb/3/tv/204/season/[0-9]+/episode/[0-9]+"
+          },
+          "response": {
+            "status": 200,
+            "headers": {
+              "Content-Type": "application/json"
+            },
+            "body": "{\"id\":{{request.path.[3]}}{{request.path.[5]}}{{request.path.[7]}},\"episode_number\":{{request.path.[7]}},\"overview\":\"Underground drama unfolds as the colony pushes on.\",\"air_date\":\"2005-04-22\",\"still_path\":\"/episode-still.jpg\"}",
+            "transformers": [
+              "response-template"
+            ]
+          }
+        }
+      ]
     }
   tmdb-movie-credits.json: |
     {
@@ -46,26 +686,7 @@ data:
       "response": {
         "status": 200,
         "headers": {"Content-Type": "application/json"},
-        "jsonBody": {"cast": [{"id": 301, "name": "Mock Actor", "profile_path": "/actor.jpg", "character": "Lead", "order": 0, "credit_id": "credit-1"}]}
-      }
-    }
-  tmdb-search-tv.json: |
-    {
-      "request": {"method": "GET", "urlPathPattern": "/tmdb/3/search/tv"},
-      "response": {
-        "status": 200,
-        "headers": {"Content-Type": "application/json"},
-        "body": "{\"results\":[{\"id\":201,\"name\":\"{{request.query.query}}\",\"original_name\":\"{{request.query.query}}\",\"popularity\":50.0}]}",
-        "transformers": ["response-template"]
-      }
-    }
-  tmdb-tv-details.json: |
-    {
-      "request": {"method": "GET", "urlPathPattern": "/tmdb/3/tv/[0-9]+"},
-      "response": {
-        "status": 200,
-        "headers": {"Content-Type": "application/json"},
-        "jsonBody": {"id": 201, "name": "Mock Show", "overview": "A mock show overview.", "first_air_date": "2015-06-01", "poster_path": "/show-poster.jpg", "backdrop_path": "/show-backdrop.jpg"}
+        "jsonBody": {"cast": [{"id": 301, "name": "Sam Rivers", "profile_path": "/actor.jpg", "character": "Lead", "order": 0, "credit_id": "credit-1"}]}
       }
     }
   tmdb-tv-aggregate-credits.json: |
@@ -74,17 +695,7 @@ data:
       "response": {
         "status": 200,
         "headers": {"Content-Type": "application/json"},
-        "jsonBody": {"cast": [{"id": 302, "name": "Mock Tv Actor", "profile_path": "/tv-actor.jpg", "order": 0, "roles": [{"character": "Self", "credit_id": "credit-2"}]}]}
-      }
-    }
-  tmdb-episode-details.json: |
-    {
-      "request": {"method": "GET", "urlPathPattern": "/tmdb/3/tv/[0-9]+/season/[0-9]+/episode/[0-9]+"},
-      "response": {
-        "status": 200,
-        "headers": {"Content-Type": "application/json"},
-        "body": "{\"id\":401,\"name\":\"Mock Episode {{request.path.[7]}}\",\"episode_number\":{{request.path.[7]}},\"overview\":\"A mock episode overview.\",\"air_date\":\"2015-06-01\",\"still_path\":\"/episode-still.jpg\"}",
-        "transformers": ["response-template"]
+        "jsonBody": {"cast": [{"id": 302, "name": "Alex Reed", "profile_path": "/tv-actor.jpg", "order": 0, "roles": [{"character": "Self", "credit_id": "credit-2"}]}]}
       }
     }
   tmdb-episode-credits.json: |
@@ -134,7 +745,7 @@ data:
       "response": {
         "status": 200,
         "headers": {"Content-Type": "application/json"},
-        "jsonBody": {"annotation": {"text": "A mock artist annotation."}, "tags": [{"name": "rock"}], "relations": [{"type": "image", "url": {"resource": "https://commons.wikimedia.org/wiki/File:Wolves.jpg"}}, {"type": "wikidata", "url": {"resource": "https://www.wikidata.org/wiki/Q901"}}]}
+        "jsonBody": {"annotation": {"text": "Wolves are a rock group formed in 2001, known for their atmospheric live sound."}, "tags": [{"name": "rock"}], "relations": [{"type": "image", "url": {"resource": "https://commons.wikimedia.org/wiki/File:Wolves.jpg"}}, {"type": "wikidata", "url": {"resource": "https://www.wikidata.org/wiki/Q901"}}]}
       }
     }
   musicbrainz-releasegroup-howling.json: |
@@ -173,7 +784,7 @@ data:
       "response": {
         "status": 200,
         "headers": {"Content-Type": "application/json"},
-        "jsonBody": {"release-groups": [{"annotation": {"text": "A mock album annotation."}}]}
+        "jsonBody": {"release-groups": [{"annotation": {"text": "A landmark release, praised for its raw energy and tight songwriting."}}]}
       }
     }
   musicbrainz-catchall.json: |
@@ -186,19 +797,138 @@ data:
         "jsonBody": {"artists": [], "release-groups": [], "releases": []}
       }
     }
-  openlibrary-search-title.json: |
+  # One title-search + one work stub per book fixture (real-looking blurbs); the
+  # generic work stub below stays as the fallback for the isbn path.
+  openlibrary-fixture-books.json: |
     {
-      "request": {
-        "method": "GET",
-        "urlPathPattern": "/openlibrary/search.json",
-        "queryParameters": {"title": {"matches": ".+"}}
-      },
-      "response": {
-        "status": 200,
-        "headers": {"Content-Type": "application/json"},
-        "body": "{\"docs\":[{\"key\":\"/works/OLW1\",\"title\":\"{{request.query.title}}\",\"cover_i\":777,\"first_publish_year\":1950}]}",
-        "transformers": ["response-template"]
-      }
+      "mappings": [
+        {
+          "request": {
+            "method": "GET",
+            "urlPathPattern": "/openlibrary/search.json",
+            "queryParameters": {
+              "title": {
+                "contains": "Night Flight"
+              }
+            }
+          },
+          "response": {
+            "status": 200,
+            "headers": {
+              "Content-Type": "application/json"
+            },
+            "jsonBody": {
+              "docs": [
+                {
+                  "key": "/works/OLW-nightflight",
+                  "title": "Night Flight",
+                  "cover_i": 777,
+                  "first_publish_year": 2015
+                }
+              ]
+            }
+          }
+        },
+        {
+          "request": {
+            "method": "GET",
+            "urlPathPattern": "/openlibrary/works/OLW-nightflight\\.json"
+          },
+          "response": {
+            "status": 200,
+            "headers": {
+              "Content-Type": "application/json"
+            },
+            "jsonBody": {
+              "description": "An owl's nocturnal journey across a moonlit landscape, told through the eyes of the forest itself."
+            }
+          }
+        },
+        {
+          "request": {
+            "method": "GET",
+            "urlPathPattern": "/openlibrary/search.json",
+            "queryParameters": {
+              "title": {
+                "contains": "Winter Sleep"
+              }
+            }
+          },
+          "response": {
+            "status": 200,
+            "headers": {
+              "Content-Type": "application/json"
+            },
+            "jsonBody": {
+              "docs": [
+                {
+                  "key": "/works/OLW-wintersleep",
+                  "title": "Winter Sleep",
+                  "cover_i": 777,
+                  "first_publish_year": 2016
+                }
+              ]
+            }
+          }
+        },
+        {
+          "request": {
+            "method": "GET",
+            "urlPathPattern": "/openlibrary/works/OLW-wintersleep\\.json"
+          },
+          "response": {
+            "status": 200,
+            "headers": {
+              "Content-Type": "application/json"
+            },
+            "jsonBody": {
+              "description": "A hedgehog prepares for hibernation as the first frost settles over the garden."
+            }
+          }
+        },
+        {
+          "request": {
+            "method": "GET",
+            "urlPathPattern": "/openlibrary/search.json",
+            "queryParameters": {
+              "title": {
+                "contains": "Spring Walk"
+              }
+            }
+          },
+          "response": {
+            "status": 200,
+            "headers": {
+              "Content-Type": "application/json"
+            },
+            "jsonBody": {
+              "docs": [
+                {
+                  "key": "/works/OLW-springwalk",
+                  "title": "Spring Walk",
+                  "cover_i": 777,
+                  "first_publish_year": 2018
+                }
+              ]
+            }
+          }
+        },
+        {
+          "request": {
+            "method": "GET",
+            "urlPathPattern": "/openlibrary/works/OLW-springwalk\\.json"
+          },
+          "response": {
+            "status": 200,
+            "headers": {
+              "Content-Type": "application/json"
+            },
+            "jsonBody": {
+              "description": "Waking from a long winter, a hedgehog rediscovers the garden one hesitant step at a time."
+            }
+          }
+        }
+      ]
     }
   openlibrary-search-isbn.json: |
     {
@@ -215,11 +945,12 @@ data:
     }
   openlibrary-work.json: |
     {
+      "priority": 9,
       "request": {"method": "GET", "urlPathPattern": "/openlibrary/works/.*\\.json"},
       "response": {
         "status": 200,
         "headers": {"Content-Type": "application/json"},
-        "jsonBody": {"description": "A mock book description."}
+        "jsonBody": {"description": "A quiet story from the testdata shelves."}
       }
     }
   openlibrary-author-search.json: |
@@ -238,7 +969,7 @@ data:
       "response": {
         "status": 200,
         "headers": {"Content-Type": "application/json"},
-        "jsonBody": {"bio": "A mock author bio.", "birth_date": "1950", "photos": [123], "remote_ids": {"wikidata": "Q902"}}
+        "jsonBody": {"bio": "An author celebrated for quiet nature stories.", "birth_date": "1950", "photos": [123], "remote_ids": {"wikidata": "Q902"}}
       }
     }
   wikidata-search-falcon.json: |
@@ -292,7 +1023,7 @@ data:
       "response": {
         "status": 200,
         "headers": {"Content-Type": "application/json"},
-        "jsonBody": {"entities": {"Q902": {"sitelinks": {"enwiki": {"title": "Mock Author"}, "nlwiki": {"title": "Mock Author"}}}}}
+        "jsonBody": {"entities": {"Q902": {"sitelinks": {"enwiki": {"title": "Owl (author)"}, "nlwiki": {"title": "Owl (auteur)"}}}}}
       }
     }
   wikidata-entity-q911.json: |
@@ -313,13 +1044,56 @@ data:
         "jsonBody": {"entities": {"Q912": {"claims": {"P31": [{"mainsnak": {"datavalue": {"value": {"id": "Q14406742"}}}}]}, "labels": {"en": {"value": "Badger"}, "nl": {"value": "Badger"}}, "sitelinks": {"enwiki": {"title": "Badger (comics)"}, "nlwiki": {"title": "Badger (strip)"}}}}}
       }
     }
+  # The summary path carries the page title, so comics get per-series prose.
+  wikipedia-fixture-summaries.json: |
+    {
+      "mappings": [
+        {
+          "request": {
+            "method": "GET",
+            "urlPathPattern": "/wikipedia/[^/]+/summary/.*Falcon.*"
+          },
+          "response": {
+            "status": 200,
+            "headers": {
+              "Content-Type": "application/json"
+            },
+            "jsonBody": {
+              "extract": "Falcon is a long-running comic series following a masked vigilante soaring above the city.",
+              "thumbnail": {
+                "source": "http://mock-external:8080/img/wiki/thumb.jpg"
+              }
+            }
+          }
+        },
+        {
+          "request": {
+            "method": "GET",
+            "urlPathPattern": "/wikipedia/[^/]+/summary/.*Badger.*"
+          },
+          "response": {
+            "status": 200,
+            "headers": {
+              "Content-Type": "application/json"
+            },
+            "jsonBody": {
+              "extract": "Badger is a cult comic series about a burrowing hero defending the woodland underworld.",
+              "thumbnail": {
+                "source": "http://mock-external:8080/img/wiki/thumb.jpg"
+              }
+            }
+          }
+        }
+      ]
+    }
   wikipedia-summary.json: |
     {
+      "priority": 9,
       "request": {"method": "GET", "urlPathPattern": "/wikipedia/[^/]+/summary/.*"},
       "response": {
         "status": 200,
         "headers": {"Content-Type": "application/json"},
-        "jsonBody": {"extract": "A mock Wikipedia summary.", "thumbnail": {"source": "http://mock-external:8080/img/wiki/thumb.jpg"}}
+        "jsonBody": {"extract": "A summary from the fixture encyclopedia.", "thumbnail": {"source": "http://mock-external:8080/img/wiki/thumb.jpg"}}
       }
     }
   itunes-search.json: |
