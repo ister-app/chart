@@ -39,18 +39,29 @@ rest() { # method path [curl args...]
   curl -fsS -X "$method" "$API$path" -H "Authorization: Bearer $TOKEN" "$@"
 }
 
-# Mints a JWT with roles=[user] at the mock issuer and puts it in $TOKEN.
+# Mints a JWT at the mock issuer for the given scope and echoes the access token.
 # The Host header matters: mock-oauth2-server builds the `iss` claim from it, and the
 # server rejects any token whose `iss` differs from OIDC_URL (http://mock-oidc:8080/default).
-mint_token() {
-  TOKEN=$(curl -fsS -X POST "http://localhost:${OIDC_PORT}/default/token" \
+# The mock maps scope 'ister' -> roles [user] and 'ister-admin' -> roles [user, admin].
+_mint() { # scope
+  local tok
+  tok=$(curl -fsS -X POST "http://localhost:${OIDC_PORT}/default/token" \
     -H 'Host: mock-oidc:8080' \
     -d grant_type=client_credentials \
     -d client_id=ci \
     -d client_secret=ci-secret \
-    -d scope=ister | jq -r '.access_token')
-  [ -n "$TOKEN" ] && [ "$TOKEN" != "null" ] || fail "no access_token from the mock issuer"
+    -d "scope=$1" | jq -r '.access_token')
+  [ -n "$tok" ] && [ "$tok" != "null" ] || fail "no access_token from the mock issuer (scope=$1)"
+  echo "$tok"
 }
+
+# Mints a roles=[user] token into $TOKEN.
+mint_token() { TOKEN=$(_mint ister); }
+
+# Mints a roles=[user, admin] token into $ADMIN_TOKEN, for the mutations the server
+# now gates on ROLE_admin (scanLibrary, subscribePodcast). Reads and user-level
+# mutations keep using $TOKEN so the plain-user path stays covered.
+mint_admin_token() { ADMIN_TOKEN=$(_mint ister-admin); }
 
 # Polls a command until it exits 0, up to a deadline. Usage:
 #   poll_until <timeout_seconds> <description> <command...>

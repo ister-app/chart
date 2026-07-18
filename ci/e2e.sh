@@ -44,6 +44,10 @@ echo "==> Minting a token with roles=[user]"
 mint_token
 export TOKEN
 
+echo "==> Minting an admin token with roles=[user, admin]"
+mint_admin_token
+export ADMIN_TOKEN
+
 echo "==> Checking the token is actually accepted (authenticated query)"
 # If OIDC_URL, the issuer or the roles claim were wrong, this is where it shows up —
 # with a clear error, rather than as a mysteriously empty library later on.

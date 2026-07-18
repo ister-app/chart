@@ -4,7 +4,8 @@
 # cache PVC, so this also exercises the cache volume wiring.
 
 echo "--> Subscribing to the test feed"
-sub=$(gql 'mutation { subscribePodcast(feedUrl: "http://podcast-feed:8080/feed.xml") { id title } }')
+# subscribePodcast is gated on ROLE_admin; refreshPodcasts below stays user-level.
+sub=$(gql 'mutation { subscribePodcast(feedUrl: "http://podcast-feed:8080/feed.xml") { id title } }' "$ADMIN_TOKEN")
 podcast_id=$(echo "$sub" | jq -r '.data.subscribePodcast.id // empty')
 [ -n "$podcast_id" ] || fail "subscribePodcast failed: $sub"
 echo "    podcast id: $podcast_id"

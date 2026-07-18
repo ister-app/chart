@@ -5,7 +5,8 @@
 # audiobook chapters, media-overlay detection on the read-aloud epub, comic page counts.
 
 echo "--> Triggering the library scan"
-scan=$(gql 'mutation { scanLibrary }')
+# scanLibrary is gated on ROLE_admin, so it needs the admin token.
+scan=$(gql 'mutation { scanLibrary }' "$ADMIN_TOKEN")
 echo "$scan" | jq -e '.data.scanLibrary == true' >/dev/null \
   || fail "scanLibrary did not return true: $scan"
 
