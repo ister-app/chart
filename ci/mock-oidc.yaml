@@ -47,6 +47,14 @@ spec:
                             "sub": "ci-user",
                             "roles": ["user"]
                           }
+                        },
+                        {
+                          "requestParam": "scope",
+                          "match": "ister-admin",
+                          "claims": {
+                            "sub": "ci-admin",
+                            "roles": ["user", "admin"]
+                          }
                         }
                       ]
                     }
