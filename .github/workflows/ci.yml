@@ -25,9 +25,9 @@ jobs:
     name: Lint and render
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: azure/setup-helm@v4
+      - uses: azure/setup-helm@v5
         with:
           version: ${{ env.HELM_VERSION }}
 
@@ -77,7 +77,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 35
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           path: chart
 
@@ -85,7 +85,7 @@ jobs:
       # have to be generated with ffmpeg. That costs ~4.5 minutes, which is far too much to
       # pay on every run — so cache the result. The key covers both the generator script and
       # the testdata commit, so the fixtures are rebuilt exactly when either changes.
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           repository: ister-app/testdata
           path: testdata
@@ -96,7 +96,7 @@ jobs:
 
       - name: Restore media fixtures
         id: fixtures
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             testdata/node1/disk1
@@ -135,13 +135,13 @@ jobs:
           echo "epub files: $(find testdata/node1/disk1 -name '*.epub' | wc -l)"
           echo "cbz files:  $(find testdata/node1/disk1 -name '*.cbz' | wc -l)"
 
-      - uses: azure/setup-helm@v4
+      - uses: azure/setup-helm@v5
         with:
           version: ${{ env.HELM_VERSION }}
 
       # The rabbitmq subchart is a small OCI pull, but it is free to keep.
       - name: Cache the chart dependencies
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: chart/charts
           key: helmdeps-${{ hashFiles('chart/Chart.lock') }}
