@@ -30,7 +30,7 @@ server:
     # Renovate keeps this tag current — see renovate.json. Now that the server repo publishes
     # semver tags, Renovate bumps this from here. Empty falls back to .Chart.AppVersion.
     # Set a digest for a reproducible rollback.
-    tag: "2.0.1"
+    tag: "2.2.0"
     digest: ""
     pullPolicy: IfNotPresent
 
