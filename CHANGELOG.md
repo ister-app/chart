@@ -1,5 +1,30 @@
 # Changelog
 
+## ister-chart v0.4.1
+
+| Component | Image | Version |
+|---|---|---|
+| server | `ghcr.io/ister-app/server` | 2.0.1 |
+| website | `ghcr.io/ister-app/player` | 1.0.0 |
+| migrations | `ghcr.io/ister-app/migrations` | 2.0.1 |
+| database | `postgres` | 18 |
+| typesense | `docker.io/typesense/typesense` | 30.2 |
+| rabbitmq | subchart `bitnamicharts/rabbitmq` | 16.0.14 |
+
+### Other
+
+- ci: mint an admin token for the admin-gated e2e mutations ([`ecad96d`](https://github.com/ister-app/chart/commit/ecad96d))
+- ci: add an admin client mapping to the mock OIDC issuer ([`9545e54`](https://github.com/ister-app/chart/commit/9545e54))
+- ci: serve fixture-aware metadata from the external-API mock ([`4dae8f1`](https://github.com/ister-app/chart/commit/4dae8f1))
+
+### Install
+
+```sh
+helm install ister oci://ghcr.io/ister-app/charts/ister --version 0.4.1
+```
+
+**Full changelog**: https://github.com/ister-app/chart/compare/v0.4.0...v0.4.1
+
 ## ister-chart v0.4.0
 
 | Component | Image | Version |
