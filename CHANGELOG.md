@@ -1,5 +1,31 @@
 # Changelog
 
+## ister-chart v0.4.2
+
+| Component | Image | Version |
+|---|---|---|
+| server | `ghcr.io/ister-app/server` | 2.2.0 |
+| website | `ghcr.io/ister-app/player` | 1.4.0 |
+| migrations | `ghcr.io/ister-app/migrations` | 2.2.0 |
+| database | `postgres` | 18 |
+| typesense | `docker.io/typesense/typesense` | 30.2 |
+| rabbitmq | subchart `bitnamicharts/rabbitmq` | 16.0.14 |
+
+### Dependency updates
+
+- chore(deps): update github actions (major) (actions/cache, actions/checkout, azure/setup-helm, helm) ([`90913a5`](https://github.com/ister-app/chart/commit/90913a5))
+- chore(deps): update ghcr.io/ister-app/server docker tag to v2.2.0 ([`2eeb782`](https://github.com/ister-app/chart/commit/2eeb782))
+- chore(deps): update ghcr.io/ister-app/player docker tag to v1.4.0 ([`fccab07`](https://github.com/ister-app/chart/commit/fccab07))
+- chore(deps): update dependency helm to v3.21.3 ([`5043495`](https://github.com/ister-app/chart/commit/5043495))
+
+### Install
+
+```sh
+helm install ister oci://ghcr.io/ister-app/charts/ister --version 0.4.2
+```
+
+**Full changelog**: https://github.com/ister-app/chart/compare/v0.4.1...v0.4.2
+
 ## ister-chart v0.4.1
 
 | Component | Image | Version |
