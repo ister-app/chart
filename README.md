@@ -3,6 +3,8 @@
 Helm chart for the [ister](https://github.com/ister-app) media server: a Spring Boot
 backend, a web frontend, PostgreSQL, RabbitMQ and Typesense.
 
+Installation guide: [ister.app/server/installation-helm](https://ister.app/server/installation-helm).
+
 ## Install
 
 Released charts are pushed to ghcr.io as OCI artifacts:

@@ -1,3 +1,7 @@
+---
+description: Install the Ister self-hosted media server on Kubernetes with Helm, including bundled PostgreSQL, RabbitMQ and Typesense or your own services.
+---
+
 # Installing ister with Helm
 
 This chapter explains how the ister Helm chart works and how to install it. The chart

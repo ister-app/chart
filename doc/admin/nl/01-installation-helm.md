@@ -1,3 +1,7 @@
+---
+description: Installeer de zelfgehoste Ister-mediaserver op Kubernetes met Helm, inclusief meegeleverde PostgreSQL, RabbitMQ en Typesense of je eigen diensten.
+---
+
 # Ister installeren met Helm
 
 Dit hoofdstuk legt uit hoe de ister Helm chart werkt en hoe je hem installeert. De chart
