@@ -1,5 +1,28 @@
 # Changelog
 
+## ister-chart v0.4.4
+
+| Component | Image | Version |
+|---|---|---|
+| server | `ghcr.io/ister-app/server` | 2.2.0 |
+| website | `ghcr.io/ister-app/player` | 1.4.0 |
+| migrations | `ghcr.io/ister-app/migrations` | 2.2.0 |
+| database | `postgres` | 18 |
+| typesense | `docker.io/typesense/typesense` | 30.2 |
+| rabbitmq | subchart `bitnamicharts/rabbitmq` | 16.0.14 |
+
+### Fixes
+
+- fix(database): widen internal-db probe timeouts so load spikes don't kill postgres ([`f7a03fa`](https://github.com/ister-app/chart/commit/f7a03fa))
+
+### Install
+
+```sh
+helm install ister oci://ghcr.io/ister-app/charts/ister --version 0.4.4
+```
+
+**Full changelog**: https://github.com/ister-app/chart/compare/v0.4.3...v0.4.4
+
 ## ister-chart v0.4.3
 
 | Component | Image | Version |
