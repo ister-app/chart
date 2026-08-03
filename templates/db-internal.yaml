@@ -82,16 +82,23 @@ spec:
           volumeMounts:
             - name: data
               mountPath: /var/lib/postgresql/data
+          # Generous timeout/threshold: with the default 1s timeout and 3 failures a
+          # busy node (e.g. an HLS transcode during the e2e) can starve pg_isready
+          # three probes in a row, and kubelet then kills a perfectly healthy
+          # database mid-test.
           livenessProbe:
             exec:
               command: [pg_isready, -U, {{ .Values.database.internal.user | quote }}]
             initialDelaySeconds: 10
             periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 6
           readinessProbe:
             exec:
               command: [pg_isready, -U, {{ .Values.database.internal.user | quote }}]
             initialDelaySeconds: 5
             periodSeconds: 5
+            timeoutSeconds: 5
           resources:
             {{- toYaml .Values.database.internal.resources | nindent 12 }}
       volumes:
