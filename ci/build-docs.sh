@@ -72,6 +72,36 @@ if filled == 0:
 print(f"filled the values table into {filled} chapter(s)", file=sys.stderr)
 PY
 
+# inject_last_update <file-to-edit> <git-tracked-path>
+# Bake Docusaurus `last_update` frontmatter from the source file's git history,
+# so the documentation site (which has no history for synced files) can show
+# "Last updated on ... by ...". Merges into an existing frontmatter block or
+# creates one. Skips silently when the file has no history (untracked file).
+inject_last_update() {
+  local file="$1" src="$2" stamp date author
+  stamp="$(git log -1 --format='%aI%x09%an' -- "$src")"
+  [ -n "$stamp" ] || return 0
+  date="${stamp%%$'\t'*}"
+  author="${stamp#*$'\t'}"
+  if [ "$(head -1 "$file")" = "---" ]; then
+    sed -i "1a last_update:\n  date: $date\n  author: \"$author\"" "$file"
+  else
+    printf -- '---\nlast_update:\n  date: %s\n  author: "%s"\n---\n\n%s\n' \
+      "$date" "$author" "$(cat "$file")" > "$file"
+  fi
+}
+
+echo "=== injecting last_update frontmatter"
+if [ "$(git rev-parse --is-shallow-repository)" = "true" ]; then
+  # PR builds check out shallowly; per-file dates would all be the tip commit.
+  # The zip a PR build produces is never published, so skip rather than lie.
+  echo "shallow checkout — skipping last_update injection"
+else
+  while IFS= read -r f; do
+    inject_last_update "$f" "${f#"$build_dir/"}"
+  done < <(find "$build_dir/doc" -name '*.md')
+fi
+
 echo "=== packaging $zip_name"
 rm -f "$root/$zip_name"
 (cd "$build_dir" && zip -qr "$root/$zip_name" doc -x '*/.gitkeep')
