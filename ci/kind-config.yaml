@@ -9,3 +9,14 @@ nodes:
       - hostPath: ./testdata
         containerPath: /testdata
         readOnly: true
+    # Published NodePorts for the player integration tests (ci/nodeports.yaml):
+    # the server on :8080 — the URL /.well-known/ister advertises — and the mock
+    # issuer on :18081. A published port survives the HLS load those tests put on
+    # it; a `kubectl port-forward` tunnel does not.
+    extraPortMappings:
+      - containerPort: 30080
+        hostPort: 8080
+        listenAddress: "127.0.0.1"
+      - containerPort: 30081
+        hostPort: 18081
+        listenAddress: "127.0.0.1"

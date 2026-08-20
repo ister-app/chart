@@ -58,6 +58,8 @@ kubectl create namespace "$NAMESPACE" --dry-run=client -o yaml | kubectl apply -
 kubectl apply -n "$NAMESPACE" -f "$SCRIPT_DIR/mock-oidc.yaml"
 kubectl apply -n "$NAMESPACE" -f "$SCRIPT_DIR/podcast-feed.yaml"
 kubectl apply -n "$NAMESPACE" -f "$SCRIPT_DIR/mock-external.yaml"
+# Reachable from the host through the node's published ports; see ci/nodeports.yaml.
+kubectl apply -n "$NAMESPACE" -f "$SCRIPT_DIR/nodeports.yaml"
 kubectl wait -n "$NAMESPACE" --for=condition=Available deploy/mock-oidc deploy/podcast-feed deploy/mock-external --timeout=180s
 
 HELM_SET_ARGS=()
