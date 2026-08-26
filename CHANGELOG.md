@@ -1,5 +1,33 @@
 # Changelog
 
+## ister-chart v0.5.0
+
+| Component | Image | Version |
+|---|---|---|
+| server | `ghcr.io/ister-app/server` | 3.0.0 |
+| website | `ghcr.io/ister-app/player` | 1.4.0 |
+| migrations | `ghcr.io/ister-app/migrations` | 3.0.0 |
+| database | `postgres` | 18 |
+| typesense | `docker.io/typesense/typesense` | 30.2 |
+| rabbitmq | subchart `bitnamicharts/rabbitmq` | 16.0.14 |
+
+### Features
+
+- feat: bake last_update frontmatter into the docs zip ([`7eb5d9c`](https://github.com/ister-app/chart/commit/7eb5d9c))
+
+### Fixes
+
+- fix(ci): drive the scan with scanLibraries and deploy server 3.0.0 ([`bac9a05`](https://github.com/ister-app/chart/commit/bac9a05))
+- fix(ci): publish the e2e API port instead of tunnelling it ([`b1ff654`](https://github.com/ister-app/chart/commit/b1ff654))
+
+### Install
+
+```sh
+helm install ister oci://ghcr.io/ister-app/charts/ister --version 0.5.0
+```
+
+**Full changelog**: https://github.com/ister-app/chart/compare/v0.4.4...v0.5.0
+
 ## ister-chart v0.4.4
 
 | Component | Image | Version |
