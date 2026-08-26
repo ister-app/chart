@@ -1,19 +1,16 @@
 name: Release
 
-# Every change to the chart itself releases a new version: bump Chart.yaml, package, push
-# to ghcr as an OCI artifact, tag, and cut a GitHub Release with notes built from the
-# commits. A Renovate PR that bumps an image tag is therefore all it takes to ship a new
-# chart — no human step in between.
+# One release per day, collecting everything that landed on main since the previous tag:
+# bump Chart.yaml, package, push to ghcr as an OCI artifact, tag, and cut a GitHub Release
+# with notes built from the commits. Renovate's image bumps merge themselves onto main
+# without a PR (renovate.json), so a night of bumps ships as a single chart version with no
+# human step in between.
 on:
-  push:
-    branches: [main]
-    paths:
-      - Chart.yaml
-      - values.yaml
-      - values.schema.json
-      - templates/**
-      # The docs ship as a zip on every release, so a doc change must release too.
-      - doc/**
+  schedule:
+    # 05:00 UTC — GitHub cron has no timezone, so that is 07:00 Amsterdam in summer and 06:00
+    # in winter. Renovate's window (renovate.json) closes at 05:00 local, leaving its last
+    # automerge time to go green before this runs.
+    - cron: "0 5 * * *"
   workflow_dispatch:
     inputs:
       bump:
@@ -32,14 +29,47 @@ permissions:
   packages: write   # helm push to ghcr
 
 jobs:
-  # The release commit is pushed by this workflow. Without the guard it would trigger
-  # itself and release again, forever.
+  # Most nights there is nothing to ship. Rather than tag an identical chart every morning,
+  # look at what changed since the previous tag — the same set of paths that used to be the
+  # push filter. This also makes the workflow self-guarding: its own `chore(release):` commit
+  # touches Chart.yaml, but the tag sits on that commit, so the diff below is empty.
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      release: ${{ steps.check.outputs.release }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - id: check
+        run: |
+          if [ "${{ github.event_name }}" = workflow_dispatch ]; then
+            echo "release=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::released on request"
+            exit 0
+          fi
+
+          prev=$(git describe --tags --abbrev=0 2>/dev/null || true)
+          # No tag yet: this is the first release, and everything counts.
+          changed=$(git diff --name-only ${prev:+"$prev"..}HEAD -- \
+            Chart.yaml values.yaml values.schema.json templates doc)
+
+          if [ -n "$changed" ]; then
+            echo "release=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::releasing, changed since ${prev:-the root commit}: $(tr '\n' ' ' <<<"$changed")"
+          else
+            echo "release=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::nothing to release since ${prev:-the root commit}"
+          fi
+
   ci:
-    if: ${{ !startsWith(github.event.head_commit.message, 'chore(release):') }}
+    needs: changes
+    if: needs.changes.outputs.release == 'true'
     uses: ./.github/workflows/ci.yml
 
   release:
-    needs: ci
+    needs: [changes, ci]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7

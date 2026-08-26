@@ -6,7 +6,12 @@
     ":semanticCommits"
   ],
   "timezone": "Europe/Amsterdam",
-  "schedule": ["* 0-6 * * *"],
+  "description": [
+    "No pull requests. Everything with automerge below lands as a renovate/* branch that Renovate fast-forwards into main once CI on that branch is green -- which is why .github/workflows/ci.yml triggers on renovate/** pushes. Without a status check on the branch Renovate would merge it unverified. Majors keep automerge:false and still open a PR.",
+    "The schedule window closes at 05:00 local so an automerged bump still has ~2h of runway before the 05:00 UTC release in .github/workflows/release.yml: the branch has to go green through the full e2e (~35 min) first."
+  ],
+  "schedule": ["* 0-4 * * *"],
+  "automergeType": "branch",
 
   "semanticCommitType": "fix",
   "semanticCommitScope": "deps",

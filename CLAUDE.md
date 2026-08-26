@@ -85,6 +85,15 @@ stopped publishing to `docker.io/bitnami` and the subchart's own default tag 404
 
 Automatic, and the details matter before you touch `Chart.yaml`:
 
+- **One release per day**, on a schedule (`cron: "0 5 * * *"` — 07:00 Amsterdam in summer, 06:00
+  in winter), not per push. A `changes` job diffs `Chart.yaml`, `values.yaml`,
+  `values.schema.json`, `templates/` and `doc/` against the previous tag and skips the whole
+  workflow when nothing moved, so an idle day tags nothing. `workflow_dispatch` releases on the
+  spot. Everything that landed since the previous tag ships as one version.
+- **Renovate does not open PRs.** `automergeType: "branch"` in `renovate.json` means an automerged
+  bump lands as a `renovate/*` branch that Renovate fast-forwards into main once CI on that branch
+  is green — which is why `ci.yml` triggers on `renovate/**` pushes and *not* on pushes to main
+  (the merged SHA was already tested). Majors keep `automerge: false` and still get a PR.
 - `Chart.yaml` `version` and `appVersion` are **written by `.github/workflows/release.yml`** — never
   bump them by hand. `appVersion` is derived from `values.yaml` `server.image.tag`.
 - The bump level comes from the commit messages since the last tag: `feat!`/`BREAKING CHANGE` →
