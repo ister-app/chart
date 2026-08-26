@@ -59,7 +59,7 @@ _mint() { # scope
 mint_token() { TOKEN=$(_mint ister); }
 
 # Mints a roles=[user, admin] token into $ADMIN_TOKEN, for the mutations the server
-# now gates on ROLE_admin (scanLibrary, subscribePodcast). Reads and user-level
+# now gates on ROLE_admin (scanLibraries, subscribePodcast). Reads and user-level
 # mutations keep using $TOKEN so the plain-user path stays covered.
 mint_admin_token() { ADMIN_TOKEN=$(_mint ister-admin); }
 

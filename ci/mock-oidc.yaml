@@ -1,6 +1,6 @@
 # A stand-in OIDC issuer for the e2e test. NOT part of the chart — CI infrastructure only.
 #
-# The server needs a real issuer because scanLibrary and every content query are
+# The server needs a real issuer because scanLibraries and every content query are
 # @PreAuthorize("hasRole('user')"). OIDCSecurityConfig reads roles from a flat "roles"
 # claim (JwtGrantedAuthoritiesConverter, authority prefix ROLE_) and does not validate
 # an audience, so a token with {"roles":["user"]} from any issuer is enough. That makes

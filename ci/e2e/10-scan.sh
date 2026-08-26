@@ -5,10 +5,12 @@
 # audiobook chapters, media-overlay detection on the read-aloud epub, comic page counts.
 
 echo "--> Triggering the library scan"
-# scanLibrary is gated on ROLE_admin, so it needs the admin token.
-scan=$(gql 'mutation { scanLibrary }' "$ADMIN_TOKEN")
-echo "$scan" | jq -e '.data.scanLibrary == true' >/dev/null \
-  || fail "scanLibrary did not return true: $scan"
+# scanLibraries is gated on ROLE_admin, so it needs the admin token. (Server 3.0.0
+# renamed scanLibrary to scanLibraries and gave it an optional libraryId; without one
+# it scans every library, which is what this suite wants.)
+scan=$(gql 'mutation { scanLibraries }' "$ADMIN_TOKEN")
+echo "$scan" | jq -e '.data.scanLibraries == true' >/dev/null \
+  || fail "scanLibraries did not return true: $scan"
 
 # The scan is asynchronous (RabbitMQ events, then ffprobe per file). Poll rather than
 # sleep — a fixed sleep is either flaky or slow.

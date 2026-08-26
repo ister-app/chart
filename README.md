@@ -242,7 +242,7 @@ Three levels of test:
   real ffmpeg-transcoded segment), `40-books` (epub resources + reading-progress
   round-trip), `50-search` (Typesense, shows and movies) and `60-watch-status` (play queue
   heartbeat → recentlyWatched).
-  This needs an OIDC issuer, because `scanLibrary` and every content query are
+  This needs an OIDC issuer, because `scanLibraries` and every content query are
   `@PreAuthorize("hasRole('user')")` — hence `ci/mock-oidc.yaml`, a mock issuer minting
   tokens with a `roles: ["user"]` claim. All external metadata sources (TMDB, MusicBrainz,
   Cover Art Archive, Open Library, Wikidata/Wikipedia, Wikimedia Commons, iTunes) are
