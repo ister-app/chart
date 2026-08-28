@@ -1,8 +1,9 @@
 # Scenario: scanning indexes every library type.
 #
 # Triggers the scan and polls until shows, movies, albums, books AND comic series all
-# have rows, then asserts the deeper structure the scanners are responsible for:
-# audiobook chapters, media-overlay detection on the read-aloud epub, comic page counts.
+# have rows, then waits for the per-file analysis that runs behind those rows before
+# asserting the deeper structure the scanners are responsible for: audiobook chapters,
+# media-overlay detection on the read-aloud epub, comic page counts.
 
 echo "--> Triggering the library scan"
 # scanLibraries is gated on ROLE_admin, so it needs the admin token. (Server 3.0.0
@@ -27,8 +28,45 @@ scan_counts() {
 }
 poll_until "${SCAN_TIMEOUT_SECONDS:-300}" "indexing all media types" scan_counts
 
+# The row counts above only prove the files were *found*: the per-file analysis that
+# fills in audiobook chapters, the media-overlay flag and comic page counts runs later,
+# in its own RabbitMQ handlers (EPUB_FILE_FOUND & friends). Asserting straight after the
+# counts is a race — it broke once the counts came in fast, with the read-aloud epub
+# still at mediaOverlays=null ("not analysed yet"). So wait for the analysis too, and
+# only then assert, so a real miss still prints the JSON instead of a timeout message.
+echo "--> Waiting for the per-file analysis (up to ${ANALYSIS_TIMEOUT_SECONDS:-180}s)"
+BOOKS_QUERY='{ books(size: 50) { content { name chapters { id } epubFiles { id mediaOverlays } } } }'
+SERIES_QUERY='{ series(size: 50) { content { name startYear books { name epubFiles { pageCount } } } } }'
+
+fetch_analysis() {
+  books_json=$(gql "$BOOKS_QUERY")
+  series_json=$(gql "$SERIES_QUERY")
+}
+
+analysis_done() {
+  fetch_analysis
+  # jq errors (a half-filled payload) just mean "not done yet" here; the asserts below
+  # report them for real.
+  echo "$books_json" | jq -e '
+    (.data.books.content | map(select(.chapters | length > 0)) | length > 0)
+    and ([.data.books.content[].epubFiles // [] | .[] | select(.mediaOverlays == true)] | length > 0)
+  ' >/dev/null 2>&1 || return 1
+  echo "$series_json" | jq -e '
+    ([.data.series.content[].books[].epubFiles // [] | .[] | select(.pageCount > 0)] | length > 0)
+    and (.data.series.content | map(select(.startYear == 1998)) | length > 0)
+  ' >/dev/null 2>&1
+}
+
+analysis_deadline=$((SECONDS + ${ANALYSIS_TIMEOUT_SECONDS:-180}))
+while :; do
+  analysis_done && break
+  [ $SECONDS -lt $analysis_deadline ] || break
+  sleep 5
+done
+# The loop leaves the last fetched payloads in $books_json / $series_json; on a timeout
+# those are what the asserts below report.
+
 echo "--> Asserting audiobook chapters"
-books_json=$(gql '{ books(size: 50) { content { name chapters { id } epubFiles { id mediaOverlays } } } }')
 echo "$books_json" | jq -e '.data.books.content | map(select(.chapters | length > 0)) | length > 0' >/dev/null \
   || fail "no book with audiobook chapters found: $(echo "$books_json" | jq -c '.data.books.content')"
 
@@ -39,7 +77,6 @@ echo "$books_json" | jq -e '[.data.books.content[].epubFiles // [] | .[] | selec
   || fail "no epub with mediaOverlays=true found: $(echo "$books_json" | jq -c '.data.books.content')"
 
 echo "--> Asserting comic volumes with pages"
-series_json=$(gql '{ series(size: 50) { content { name startYear books { name epubFiles { pageCount } } } } }')
 echo "$series_json" | jq -e '[.data.series.content[].books[].epubFiles // [] | .[] | select(.pageCount > 0)] | length > 0' >/dev/null \
   || fail "no comic volume with pageCount > 0: $(echo "$series_json" | jq -c '.data.series.content')"
 echo "$series_json" | jq -e '.data.series.content | map(select(.startYear == 1998)) | length > 0' >/dev/null \
