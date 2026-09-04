@@ -114,12 +114,18 @@ database:
   internal:
     storageSize: 1Gi
     retain: false
+    # 1Gi, not the chart default's 512Mi: the player's doc tour got postgres
+    # OOMKilled (exit 137, cgroup limit) at that size — three CI hangs in a row
+    # on 2026-09-02/04, each with the database restarting the second the album
+    # page fired its queries, on top of the segment-detection writes still
+    # running from the scan. The probe widening (f7a03fa) covered the *slow*
+    # database; this covers the one the kernel kills. A GitHub runner has 16 GB.
     resources:
       requests:
         cpu: 50m
-        memory: 128Mi
+        memory: 256Mi
       limits:
-        memory: 512Mi
+        memory: 1Gi
 
 rabbitmq:
   enabled: true
