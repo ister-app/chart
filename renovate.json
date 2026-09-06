@@ -28,13 +28,6 @@
       "automerge": true
     },
     {
-      "description": "Third-party majors are never automerged. They land on the dependency dashboard and wait for a human. Rules are applied in order, so this sits before the first-party rule below, which overrides it.",
-      "matchUpdateTypes": [
-        "major"
-      ],
-      "automerge": false
-    },
-    {
       "description": "GitHub Actions. Grouped, and chore(deps) rather than fix(deps) so a bumped action does not release a new chart -- .github/ is not among the paths release.yml diffs. Needs the RENOVATE_TOKEN PAT with the workflow scope: GITHUB_TOKEN may not push changes under .github/workflows/.",
       "matchManagers": [
         "github-actions"
@@ -42,6 +35,13 @@
       "groupName": "github actions",
       "semanticCommitType": "chore",
       "automerge": true
+    },
+    {
+      "description": "Third-party majors are never automerged, actions included (a helm 4 in the release workflow is not a patch). They land on the dependency dashboard and wait for a human. Rules apply in order: this sits after the actions rule so it overrides its automerge, and before the first-party rule below, which overrides this one.",
+      "matchUpdateTypes": [
+        "major"
+      ],
+      "automerge": false
     },
     {
       "description": "First-party ister images: every server or player release, majors included, becomes a chart release -- the chart pins them independently and the release e2e is the gate, so a first-party major that needs a chart change fails the release (and blocks the following ones) until the chart catches up. Each image gets its own branch and its own version line; server, player and migrations do not move in lockstep.",

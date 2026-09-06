@@ -81,7 +81,9 @@ jobs:
 
       - uses: azure/setup-helm@v5
         with:
-          version: v4.2.4
+          # Same major as ci.yml's HELM_VERSION: the chart is linted and e2e-tested with
+          # helm 3, so it is packaged with helm 3. A helm 4 bump is a PR, not an automerge.
+          version: v3.21.4
 
       - name: Work out the new chart version
         id: version
@@ -164,12 +166,14 @@ jobs:
           git add Chart.yaml CHANGELOG.md
           git commit -m "chore(release): v${VERSION}"
 
-          # Annotated on purpose: --follow-tags below pushes annotated tags only, and a
-          # lightweight one would silently stay behind on the runner — main would carry the
-          # release commit while the tag, the GitHub Release, and the next night's
-          # `git describe` all went missing.
+          # main first, the tag second, as two pushes. Done in one push, a rejected main
+          # (someone pushed while CI ran) still leaves the tag behind, on a commit that is
+          # on no branch — and the next release, computing its version from the tags on
+          # main, then trips over the existing tag name. Annotated, so that the GitHub
+          # Release and `git describe` see it.
+          git push origin HEAD:main
           git tag -a "v${VERSION}" -m "v${VERSION}"
-          git push origin HEAD:main --follow-tags
+          git push origin "v${VERSION}"
 
           gh release create "v${VERSION}" "ister-${VERSION}.tgz" "ister-chart-docs-${VERSION}.zip" \
             --title "v${VERSION}" \
