@@ -1,0 +1,29 @@
+# The previous released chart, installed as the starting point of the upgrade test. Keys
+# limited to what every chart version since 0.5 accepts; no media (the upgrade job runs
+# without the fixtures). The Bitnami-era rabbitmq.* keys are what the OLD chart expects.
+server:
+  name: upgrade
+  tmdbApiKey: mock-key
+  oidc:
+    url: http://mock-oidc:8080/default
+  resources:
+    requests: {cpu: 100m, memory: 512Mi}
+    limits: {memory: 3Gi}
+  probes:
+    startup: {failureThreshold: 60, periodSeconds: 5}
+cache:
+  size: 1Gi
+  retain: false
+database:
+  mode: internal
+  internal:
+    storageSize: 1Gi
+    retain: false
+rabbitmq:
+  enabled: true
+  persistence:
+    enabled: false
+typesense:
+  enabled: true
+  persistence:
+    enabled: false

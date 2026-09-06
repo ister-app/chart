@@ -146,7 +146,6 @@ jobs:
 
       - name: Package
         run: |
-          helm dependency build
           helm package .
 
       - name: Push the chart to ghcr

@@ -1,0 +1,11 @@
+# On top of ci/values-ci.yaml: an HTTPRoute on the Gateway that
+# ci/exposure/gateway-envoy.sh creates, reached through a port-forward on 8091.
+server:
+  url: http://ister.test:8091/api
+gateway:
+  enabled: true
+  hostnames: [ister.test]
+  parentRefs:
+    - name: ister-gateway
+      sectionName: http
+  tls: false

@@ -41,13 +41,12 @@ jobs:
         with:
           version: ${{ env.HELM_VERSION }}
 
-      - run: helm dependency build
-
       - name: Lint every profile
         run: |
           helm lint . -f values-dev.yaml --set server.tmdbApiKey=x
           helm lint . -f values-production.example.yaml --set server.tmdbApiKey=x
           helm lint . -f ci/values-ci.yaml
+          helm lint . -f ci/values-render-full.yaml
 
       - name: Render every profile
         run: |
@@ -56,6 +55,9 @@ jobs:
           helm template ister . -f values-dev.yaml --set server.tmdbApiKey=x > /dev/null
           helm template ister . -f values-production.example.yaml --set server.tmdbApiKey=x > /dev/null
           helm template ister . -f ci/values-ci.yaml > /dev/null
+          helm template ister . -f ci/values-ci.yaml -f ci/values-ingress-nginx.yaml > /dev/null
+          helm template ister . -f ci/values-ci.yaml -f ci/values-gateway-envoy.yaml > /dev/null
+          helm template ister . -f ci/values-upgrade-to.yaml > /dev/null
           # All-external: no bundled datastores at all.
           helm template ister . \
             --set server.tmdbApiKey=x --set server.oidc.url=https://oidc.example/realms/a \
@@ -64,18 +66,26 @@ jobs:
             --set rabbitmq.enabled=false --set externalRabbitmq.host=rmq \
             --set externalRabbitmq.password=p \
             --set typesense.enabled=false --set typesense.external.host=ts \
-            --set typesense.external.existingSecret=ts > /dev/null
+            --set typesense.external.apiKey=k > /dev/null
 
-      # kubeconform's image has no helm, so render on the runner first (helm is set up above,
-      # and `dependency build` already resolved the subchart) and hand the file to the
-      # container's own /kubeconform entrypoint — piping helm *inside* the image cannot work.
+      # kubeconform's image has no helm, so render on the runner first and hand the files
+      # to the container's own /kubeconform entrypoint — piping helm *inside* the image
+      # cannot work. The full profile carries every optional resource (HTTPRoute, helper
+      # pods, NetworkPolicies, ...); the CRD catalog supplies the Gateway API schema.
       - name: Render for schema validation
-        run: helm template ister . -f ci/values-ci.yaml > kubeconform-manifests.yaml
+        run: |
+          helm template ister . -f ci/values-ci.yaml > kubeconform-ci.yaml
+          helm template ister . -f ci/values-render-full.yaml > kubeconform-full.yaml
+          helm template ister . -f ci/values-ci.yaml -f ci/values-gateway-envoy.yaml > kubeconform-gateway.yaml
 
       - name: Validate rendered manifests against Kubernetes schemas
         uses: docker://ghcr.io/yannh/kubeconform:latest-alpine
         with:
-          args: -strict -summary -ignore-missing-schemas kubeconform-manifests.yaml
+          args: >-
+            -strict -summary -ignore-missing-schemas
+            -schema-location default
+            -schema-location https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json
+            kubeconform-ci.yaml kubeconform-full.yaml kubeconform-gateway.yaml
 
       # Catches a broken VALUES marker or values.yaml drift on the PR instead of
       # letting it fail the release build.
@@ -83,9 +93,34 @@ jobs:
         run: ./ci/build-docs.sh 0.0.0-ci
 
   e2e:
-    name: End-to-end on kind
+    name: End-to-end on kind (${{ matrix.name }})
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # The full suite, reached through the chart's own NodePort Service, on kind's
+          # current default Kubernetes and on the oldest one still worth caring about.
+          - name: nodeport
+            exposure: nodeport
+            node_image: ""
+            e2e_only: ""
+          - name: nodeport-k8s-1.34
+            exposure: nodeport
+            node_image: kindest/node:v1.34.11
+            e2e_only: ""
+          # The exposure variants run the streaming scenario only: it is the one that
+          # exercises what a proxy gets wrong (long responses, body sizes, the stream-token
+          # query, playlist URIs), and the whole suite would cost 35 minutes per variant.
+          - name: ingress-nginx
+            exposure: ingress-nginx
+            node_image: ""
+            e2e_only: "30-*"
+          - name: gateway-envoy
+            exposure: gateway-envoy
+            node_image: ""
+            e2e_only: "30-*"
     steps:
       - uses: actions/checkout@v7
         with:
@@ -149,13 +184,6 @@ jobs:
         with:
           version: ${{ env.HELM_VERSION }}
 
-      # The rabbitmq subchart is a small OCI pull, but it is free to keep.
-      - name: Cache the chart dependencies
-        uses: actions/cache@v6
-        with:
-          path: chart/charts
-          key: helmdeps-${{ hashFiles('chart/Chart.lock') }}
-
       # The container images (~1.5 GB in total, of which the native server image is ~690 MB)
       # are deliberately NOT cached. Restoring them from the Actions cache is about as slow
       # as pulling them from a registry the runner has a fast path to, and it would eat most
@@ -165,6 +193,7 @@ jobs:
         with:
           config: chart/ci/kind-config.yaml
           cluster_name: ister
+          node_image: ${{ matrix.node_image }}
 
       - name: Deploy the mock OIDC issuer, podcast feed server and external-API mock
         run: |
@@ -174,11 +203,17 @@ jobs:
           kubectl apply -n ister -f chart/ci/mock-external.yaml
           kubectl wait -n ister --for=condition=Available deploy/mock-oidc deploy/podcast-feed deploy/mock-external --timeout=180s
 
+      - name: Install the ${{ matrix.exposure }} controller
+        if: matrix.exposure != 'nodeport'
+        working-directory: chart
+        run: NAMESPACE=ister ci/exposure/${{ matrix.exposure }}.sh
+
       - name: Install the chart
         working-directory: chart
         run: |
-          helm dependency build
-          helm upgrade --install ister . -n ister -f ci/values-ci.yaml --wait --timeout 15m
+          extra=""
+          [ "${{ matrix.exposure }}" = nodeport ] || extra="-f ci/values-${{ matrix.exposure }}.yaml"
+          helm upgrade --install ister . -n ister -f ci/values-ci.yaml $extra --wait --timeout 15m
 
       - name: Wait for everything to be ready
         run: |
@@ -188,9 +223,29 @@ jobs:
       - name: helm test (unauthenticated smoke)
         run: helm test ister -n ister --logs
 
+      # The variants reach the API the way a client would: through the controller, on the
+      # hostname the chart advertises. ingress-nginx sits on kind's published host port
+      # 8090; the Envoy Service is port-forwarded (kind has no LoadBalancer).
       - name: End-to-end (scan and index real media)
         working-directory: chart
-        run: ./ci/e2e.sh ister ister
+        run: |
+          case "${{ matrix.exposure }}" in
+            ingress-nginx)
+              export E2E_API_URL=http://ister.test:8090/api
+              export E2E_CURL_ARGS="--resolve ister.test:8090:127.0.0.1" ;;
+            gateway-envoy)
+              ci/exposure/gateway-envoy-forward.sh ister &
+              export E2E_API_URL=http://ister.test:8091/api
+              export E2E_CURL_ARGS="--resolve ister.test:8091:127.0.0.1" ;;
+          esac
+          if [ -n "${{ matrix.e2e_only }}" ]; then
+            # The scan has to run first or there is nothing to stream; the scenario
+            # scripts are independent files, so run scan + the selected ones.
+            E2E_ONLY="10-*" ./ci/e2e.sh ister ister
+            E2E_ONLY="${{ matrix.e2e_only }}" ./ci/e2e.sh ister ister
+          else
+            ./ci/e2e.sh ister ister
+          fi
 
       - name: Diagnostics
         if: failure()
@@ -212,4 +267,63 @@ jobs:
             for c in wait-for-db flyway; do
               kubectl logs -n ister "$p" -c "$c" --tail=50 2>/dev/null | sed "s/^/[$c] /" || true
             done
+          done
+
+  # A chart is only as good as its upgrade: install the previous release from ghcr, then
+  # upgrade to the working tree the way an operator would (no media, bundled datastores).
+  # This is where a renamed value, a changed Secret key or a selector change surfaces.
+  upgrade:
+    name: Upgrade from the previous release
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - uses: azure/setup-helm@v5
+        with:
+          version: ${{ env.HELM_VERSION }}
+
+      - name: Previous chart version
+        id: prev
+        run: |
+          prev=$(git describe --tags --abbrev=0 --match 'v*' 2>/dev/null | sed 's/^v//')
+          [ -n "$prev" ] || { echo "::notice::no previous tag, nothing to upgrade from"; exit 0; }
+          echo "version=$prev" >> "$GITHUB_OUTPUT"
+
+      - name: Create kind cluster
+        if: steps.prev.outputs.version != ''
+        uses: helm/kind-action@v1
+        with:
+          cluster_name: ister-upgrade
+
+      - name: Install the previous release
+        if: steps.prev.outputs.version != ''
+        run: |
+          kubectl create namespace ister
+          kubectl apply -n ister -f ci/mock-oidc.yaml
+          kubectl wait -n ister --for=condition=Available deploy/mock-oidc --timeout=180s
+          helm install ister oci://ghcr.io/ister-app/charts/ister \
+            --version ${{ steps.prev.outputs.version }} -n ister \
+            -f ci/values-upgrade-from.yaml --wait --timeout 15m
+
+      # Charts before 1.0 shipped RabbitMQ as the Bitnami subchart; its StatefulSet is not
+      # adopted (the queues hold pass-through work only), so it goes the way the docs say.
+      - name: Upgrade to this chart
+        if: steps.prev.outputs.version != ''
+        run: |
+          kubectl delete -n ister statefulset,service,pvc -l app.kubernetes.io/name=rabbitmq --ignore-not-found
+          helm upgrade ister . -n ister -f ci/values-upgrade-to.yaml --wait --timeout 15m
+          kubectl wait -n ister --for=condition=Ready pod --all --timeout=10m
+          helm test ister -n ister --logs
+
+      - name: Diagnostics
+        if: failure()
+        run: |
+          kubectl get pods -n ister -o wide
+          kubectl get events -n ister --sort-by=.lastTimestamp | tail -40
+          kubectl get pods -n ister -o name | while read -r p; do
+            echo "----- $p"
+            kubectl logs -n ister "$p" --all-containers --prefix --tail=100 || true
           done

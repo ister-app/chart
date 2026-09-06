@@ -15,7 +15,7 @@ echo "    bookId: $book_id, epub mediaFileId: $epub_media_file_id"
 echo "--> Fetching an epub resource (META-INF/container.xml)"
 stream_token=$(gql 'mutation { createStreamToken { token } }' | jq -r '.data.createStreamToken.token // empty')
 [ -n "$stream_token" ] || fail "createStreamToken returned no token"
-container=$(curl -fsS "$API/epub/$epub_media_file_id/resource/META-INF/container.xml?token=$stream_token")
+container=$(api_curl "$API/epub/$epub_media_file_id/resource/META-INF/container.xml?token=$stream_token")
 echo "$container" | grep -q '<container' || fail "epub container.xml not served: $container"
 
 echo "--> Round-tripping reading progress"

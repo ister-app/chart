@@ -1,0 +1,65 @@
+# Render-only profile for the lint job: every optional resource at once (helper pods with
+# hardware acceleration, NetworkPolicies, the Traefik preset, an external Typesense), so a
+# template that only breaks when a feature is on still breaks CI.
+server:
+  tmdbApiKey: x
+  oidc:
+    url: https://oidc.example/realms/a
+  clusterName: Home
+  languages: en,nl
+  websocketAllowedOrigins: "*"
+  hwaccel:
+    type: vaapi
+    resources: {gpu.intel.com/i915: 1}
+    supplementalGroups: [44, 105]
+  helper:
+    offloadJobs: [DETECT_SEGMENTS, SUBTITLES]
+  libraries:
+    - {name: shows, type: SHOW}
+  mediaVolumes:
+    - {name: shows, library: shows, mountPath: /media/shows, hostPath: /srv/shows}
+  extraEnvFrom:
+    - configMapRef: {name: more-settings}
+  extraVolumes:
+    - {name: scratch, emptyDir: {}}
+  extraVolumeMounts:
+    - {name: scratch, mountPath: /scratch}
+  topologySpreadConstraints:
+    - maxSkew: 1
+      topologyKey: kubernetes.io/hostname
+      whenUnsatisfiable: ScheduleAnyway
+      labelSelector: {matchLabels: {app.kubernetes.io/component: server}}
+helpers:
+  - name: gpu
+    disks: [{name: shows}]
+    hwaccel: {type: vaapi, hostPath: true, privileged: true, supplementalGroups: [105]}
+  - name: cpu
+    disks: [{name: shows, jobs: [DETECT_SEGMENTS]}]
+    jobs: [DETECT_SEGMENTS, SUBTITLES]
+    cache: {existingClaim: scratch}
+global:
+  imageRegistry: harbor.example.com/proxy/
+commonLabels:
+  team: media
+ingress:
+  enabled: true
+  className: traefik
+  controller: traefik
+  host: ister.example.com
+  tls:
+    certIssuer: letsencrypt
+networkPolicy:
+  enabled: true
+  ingressFrom:
+    - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: traefik}}
+typesense:
+  enabled: false
+  external:
+    host: search.example.com
+    port: 443
+    protocol: https
+    apiKey: k
+monitoring:
+  enabled: true
+podDisruptionBudget:
+  enabled: true

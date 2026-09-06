@@ -20,9 +20,12 @@ ci/release-notes.sh 0.3.0 v0.2.0 && cat RELEASE_NOTES.md   # release notes, runs
 ci/build-docs.sh 0.0.0-local                               # the docs zip, runs locally
 ```
 
-There are four value profiles and CI renders all of them; a change to `values.yaml` or a template
-must survive `values-dev.yaml`, `values-production.example.yaml`, `ci/values-ci.yaml`, and the
-all-external permutation (no bundled datastores) spelled out in `.github/workflows/ci.yml`.
+There are several value profiles and CI renders all of them; a change to `values.yaml` or a
+template must survive `values-dev.yaml`, `values-production.example.yaml`, `ci/values-ci.yaml`
+(with the `ci/values-ingress-nginx.yaml` / `ci/values-gateway-envoy.yaml` overlays),
+`ci/values-render-full.yaml` (every optional resource on) and the all-external permutation (no
+bundled datastores) spelled out in `.github/workflows/ci.yml`. kubeconform validates the
+renders, with the datreeio CRD catalog for the Gateway API resources.
 
 Full e2e on kind (needs kind, helm, jq, ffmpeg, zip, a container runtime, and the testdata repo
 cloned as a sibling):
@@ -32,7 +35,15 @@ make up          # fixtures + kind + mock-oidc/podcast-feed/mock-external + helm
 make e2e         # ci/e2e.sh: the scenario scripts in ci/e2e/, in order
 make player-e2e  # the player repo's Flutter integration tests (needs ../player + flutter)
 make down
+make up EXPOSURE=ingress-nginx && make e2e-ingress   # through a real ingress controller
 ```
+
+`ci/e2e.sh` takes `E2E_API_URL` + `E2E_CURL_ARGS` to reach the API through an ingress or
+Gateway instead of a port-forward; `ci/up.sh` takes `EXPOSURE=ingress-nginx|gateway-envoy`
+and installs that controller with `ci/exposure/<name>.sh` plus `ci/values-<name>.yaml`. CI
+runs both variants (streaming scenario only) next to the full NodePort suite, and an
+`upgrade` job that installs the previous release from ghcr and upgrades to the working
+tree.
 
 `ci/e2e.sh` sources `ci/e2e/lib.sh` and runs the numbered scenarios (scan, metadata enrichment,
 podcast, HLS streaming with a real transcode, books, search, watch status); select with

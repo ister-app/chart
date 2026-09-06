@@ -1,0 +1,11 @@
+# On top of ci/values-ci.yaml: publish through the ingress-nginx that
+# ci/exposure/ingress-nginx.sh installs, on kind's host port 8090.
+server:
+  url: http://ister.test:8090/api
+ingress:
+  enabled: true
+  className: nginx
+  controller: nginx
+  host: ister.test
+  tls:
+    enabled: false
