@@ -1,5 +1,44 @@
 # Changelog
 
+## ister-chart v0.5.1
+
+| Component | Image | Version |
+|---|---|---|
+| server | `ghcr.io/ister-app/server` | 3.4.1 |
+| website | `ghcr.io/ister-app/player` | 2.7.1 |
+| migrations | `ghcr.io/ister-app/migrations` | 3.4.1 |
+| database | `postgres` | 18 |
+| typesense | `docker.io/typesense/typesense` | 30.2 |
+| rabbitmq | subchart `bitnamicharts/rabbitmq` | 16.0.14 |
+
+### Fixes
+
+- fix(ci): push main before the tag, keep third-party majors off automerge ([`07fc539`](https://github.com/ister-app/chart/commit/07fc539))
+- fix(ci): give the e2e database 1Gi so postgres survives the player's tour ([`b669eed`](https://github.com/ister-app/chart/commit/b669eed))
+- fix(ci): wait for the per-file analysis before the scan asserts ([`03557f4`](https://github.com/ister-app/chart/commit/03557f4))
+
+### Dependency updates
+
+- chore(deps): update ghcr.io/ister-app/player docker tag to v2 ([`f5ae445`](https://github.com/ister-app/chart/commit/f5ae445))
+- chore(deps): update dependency helm to v4 ([`d178676`](https://github.com/ister-app/chart/commit/d178676))
+- chore(deps): update ghcr.io/ister-app/server docker tag to v3.4.1 ([`123fc10`](https://github.com/ister-app/chart/commit/123fc10))
+- chore(deps): update ghcr.io/ister-app/player docker tag to v1.19.0 ([`2c74b58`](https://github.com/ister-app/chart/commit/2c74b58))
+- chore(deps): update dependency helm to v3.21.4 ([`32e0a2a`](https://github.com/ister-app/chart/commit/32e0a2a))
+
+### Other
+
+- ci: run Renovate three passes per day so every automerge lands ([`7609f5a`](https://github.com/ister-app/chart/commit/7609f5a))
+- ci: run Renovate self-hosted and release once a day after the app releases ([`6237d36`](https://github.com/ister-app/chart/commit/6237d36))
+- chore(ci): merge renovate updates without PRs and release on a daily schedule ([`eec594c`](https://github.com/ister-app/chart/commit/eec594c))
+
+### Install
+
+```sh
+helm install ister oci://ghcr.io/ister-app/charts/ister --version 0.5.1
+```
+
+**Full changelog**: https://github.com/ister-app/chart/compare/v0.5.0...v0.5.1
+
 ## ister-chart v0.5.0
 
 | Component | Image | Version |
