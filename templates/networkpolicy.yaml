@@ -1,0 +1,86 @@
+{{- if .Values.networkPolicy.enabled }}
+{{- $fullname := include "ister.fullname" . }}
+{{- $release := include "ister.selectorLabels" (dict "ctx" .) | fromYaml }}
+{{- /* Every pod of this release: the server, helpers, the website, the datastores and
+       the helm test pod. Datastores accept traffic from these and nothing else. */}}
+{{- $fromRelease := list (dict "podSelector" (dict "matchLabels" $release)) }}
+{{- $fromOutside := concat $fromRelease .Values.networkPolicy.ingressFrom }}
+# Ingress-only policies (egress stays open: the server talks to TMDB, MusicBrainz,
+# podcast feeds and your OIDC issuer). The server and website accept traffic from the
+# release's own pods and from networkPolicy.ingressFrom — put your ingress controller's
+# or Gateway's namespace there, and Prometheus for the monitor port.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ $fullname }}-server
+  labels:
+    {{- include "ister.labels" (dict "ctx" . "component" "server") | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "ister.selectorLabels" (dict "ctx" . "component" "server") | nindent 6 }}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        {{- toYaml $fromOutside | nindent 8 }}
+      ports:
+        - port: 8080
+        - port: {{ .Values.server.managementPort }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ $fullname }}-website
+  labels:
+    {{- include "ister.labels" (dict "ctx" . "component" "website") | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "ister.selectorLabels" (dict "ctx" . "component" "website") | nindent 6 }}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        {{- toYaml $fromOutside | nindent 8 }}
+      ports:
+        - port: {{ .Values.website.port }}
+{{- range $helper := .Values.helpers }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ $fullname }}-helper-{{ $helper.name }}
+  labels:
+    {{- include "ister.labels" (dict "ctx" $ "component" (printf "helper-%s" $helper.name)) | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "ister.selectorLabels" (dict "ctx" $ "component" (printf "helper-%s" $helper.name)) | nindent 6 }}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        {{- toYaml $fromOutside | nindent 8 }}
+      ports:
+        - port: 8080
+        - port: {{ $.Values.server.managementPort }}
+{{- end }}
+{{- range $component := list "database" "rabbitmq" "typesense" }}
+{{- $enabled := or (and (eq $component "database") (eq $.Values.database.mode "internal")) (and (eq $component "rabbitmq") $.Values.rabbitmq.enabled) (and (eq $component "typesense") $.Values.typesense.enabled) }}
+{{- if $enabled }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ $fullname }}-{{ $component }}
+  labels:
+    {{- include "ister.labels" (dict "ctx" $ "component" $component) | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "ister.selectorLabels" (dict "ctx" $ "component" $component) | nindent 6 }}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        {{- toYaml $fromRelease | nindent 8 }}
+{{- end }}
+{{- end }}
+{{- end }}

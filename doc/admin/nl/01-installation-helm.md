@@ -183,6 +183,16 @@ devicebestand van de node, wat de device-cgroup alleen toestaat voor een privile
 container (`hwaccel.privileged`). Zet de group-id's van `video`/`render` van de node in
 `hwaccel.supplementalGroups` als het device group-eigendom is.
 
+## Netwerkbeleid en podbeveiliging
+
+`networkPolicy.enabled: true` rendert NetworkPolicies voor alleen inkomend verkeer: de
+datastores accepteren alleen verkeer van de pods van deze release, de server, helpers en
+website ook van `networkPolicy.ingressFrom` — zet daar de namespace van je ingress-controller
+of Gateway in, en Prometheus voor de monitorpoort. Uitgaand verkeer blijft open
+(metadatabronnen, podcastfeeds, je OIDC-issuer). De pods voldoen aan de Pod Security
+Standard "restricted"; zet op OpenShift `runAsUser`/`fsGroup` op `null` in de
+`podSecurityContext`-blokken zodat de SCC de UID toewijst.
+
 ## Beheer
 
 - **Upgrades**: `helm upgrade ister oci://ghcr.io/ister-app/charts/ister --version <v>`
