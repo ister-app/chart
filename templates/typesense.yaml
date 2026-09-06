@@ -111,7 +111,12 @@ metadata:
   name: {{ $fullname }}-typesense
   labels:
     {{- include "ister.labels" (dict "ctx" . "component" "typesense") | nindent 4 }}
+  {{- with .Values.typesense.service.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
 spec:
+  {{- include "ister.serviceSpec" .Values.typesense.service | nindent 2 }}
   ports:
     - name: http
       port: {{ .Values.typesense.port }}

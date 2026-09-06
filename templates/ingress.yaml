@@ -11,10 +11,12 @@ metadata:
     {{- if and .Values.ingress.tls.enabled .Values.ingress.tls.certIssuer }}
     cert-manager.io/cluster-issuer: {{ .Values.ingress.tls.certIssuer | quote }}
     {{- end }}
+    {{- with (include "ister.ingressPresetAnnotations" . | fromYaml) }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
     {{- if .Values.ingress.wellKnown.enabled }}
-    {{- /* Client discovery document. Built from the same values as OIDC_URL and
-           APP_ISTER_SERVER_URL, so the three cannot drift apart.
-           Requires allow-snippet-annotations=true in the ingress-nginx config. */}}
+    {{- /* Legacy path: ingress-nginx only, and only with allow-snippet-annotations=true.
+           website.wellKnown serves the same document from the website pod instead. */}}
     nginx.ingress.kubernetes.io/server-snippet: |
       location /.well-known/ister {
         default_type text/plain;
@@ -45,12 +47,12 @@ spec:
               service:
                 name: {{ $fullname }}-server
                 port:
-                  name: http
+                  number: {{ .Values.server.service.port }}
           - path: /
             pathType: Prefix
             backend:
               service:
                 name: {{ $fullname }}-website
                 port:
-                  name: http
+                  number: {{ .Values.website.service.port }}
 {{- end }}

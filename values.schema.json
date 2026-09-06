@@ -253,6 +253,68 @@
               }
             ]
           }
+        },
+        "service": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "type": "string",
+              "enum": [
+                "ClusterIP",
+                "NodePort",
+                "LoadBalancer"
+              ]
+            },
+            "port": {
+              "type": "integer"
+            },
+            "nodePort": {
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "annotations": {
+              "type": "object"
+            },
+            "labels": {
+              "type": "object"
+            },
+            "loadBalancerIP": {
+              "type": "string"
+            },
+            "loadBalancerClass": {
+              "type": "string"
+            },
+            "externalTrafficPolicy": {
+              "type": "string",
+              "enum": [
+                "",
+                "Cluster",
+                "Local"
+              ]
+            },
+            "ipFamilyPolicy": {
+              "type": "string",
+              "enum": [
+                "",
+                "SingleStack",
+                "PreferDualStack",
+                "RequireDualStack"
+              ]
+            },
+            "ipFamilies": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "IPv4",
+                  "IPv6"
+                ]
+              }
+            }
+          }
         }
       },
       "required": [
@@ -315,6 +377,83 @@
             },
             "path": {
               "type": "string"
+            }
+          }
+        },
+        "service": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "type": "string",
+              "enum": [
+                "ClusterIP",
+                "NodePort",
+                "LoadBalancer"
+              ]
+            },
+            "port": {
+              "type": "integer"
+            },
+            "nodePort": {
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "annotations": {
+              "type": "object"
+            },
+            "labels": {
+              "type": "object"
+            },
+            "loadBalancerIP": {
+              "type": "string"
+            },
+            "loadBalancerClass": {
+              "type": "string"
+            },
+            "externalTrafficPolicy": {
+              "type": "string",
+              "enum": [
+                "",
+                "Cluster",
+                "Local"
+              ]
+            },
+            "ipFamilyPolicy": {
+              "type": "string",
+              "enum": [
+                "",
+                "SingleStack",
+                "PreferDualStack",
+                "RequireDualStack"
+              ]
+            },
+            "ipFamilies": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "IPv4",
+                  "IPv6"
+                ]
+              }
+            }
+          }
+        },
+        "extraEnv": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "wellKnown": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean"
             }
           }
         }
@@ -385,6 +524,30 @@
           "properties": {
             "enabled": {
               "type": "boolean"
+            }
+          }
+        },
+        "controller": {
+          "type": "string",
+          "enum": [
+            "",
+            "nginx",
+            "traefik",
+            "haproxy"
+          ]
+        },
+        "proxy": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "bodySize": {
+              "type": [
+                "string",
+                "integer"
+              ]
+            },
+            "timeoutSeconds": {
+              "type": "integer"
             }
           }
         }
@@ -699,6 +862,34 @@
               "type": "string"
             }
           }
+        },
+        "service": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "annotations": {
+              "type": "object"
+            },
+            "ipFamilyPolicy": {
+              "type": "string",
+              "enum": [
+                "",
+                "SingleStack",
+                "PreferDualStack",
+                "RequireDualStack"
+              ]
+            },
+            "ipFamilies": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "IPv4",
+                  "IPv6"
+                ]
+              }
+            }
+          }
         }
       }
     },
@@ -761,6 +952,45 @@
       "properties": {
         "image": {
           "$ref": "#/definitions/image"
+        }
+      }
+    },
+    "gateway": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "hostnames": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "parentRefs": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "annotations": {
+          "type": "object"
+        },
+        "tls": {
+          "type": "boolean"
+        },
+        "apiTimeouts": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "request": {
+              "type": "string"
+            },
+            "backendRequest": {
+              "type": "string"
+            }
+          }
         }
       }
     }

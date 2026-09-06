@@ -115,14 +115,38 @@ Two more storage knobs matter:
 - `server.tmp` — scratch space for transcoding. Disable it when `mountPath` falls inside
   one of your media volumes, or the dedicated volume shadows that path.
 
-## Ingress
+## Exposing it: Ingress or Gateway API
 
-`ingress.enabled: true` publishes the player at `/` and the API at `server.contextPath`
-(default `/api`) on `ingress.host`, with TLS via cert-manager when
-`ingress.tls.certIssuer` is set. `ingress.wellKnown.enabled` additionally serves
-`/.well-known/ister` for client discovery — implemented as an ingress-nginx
-server-snippet, which modern ingress-nginx disables by default
-(`allow-snippet-annotations`); enable that on the controller first.
+Both publish the player at `/` and the API at `server.contextPath` (default `/api`) on one
+hostname; pick one.
+
+- **Ingress** — `ingress.enabled: true` with `ingress.host`. `ingress.className` is empty
+  by default (the cluster's default IngressClass); set it when you run several
+  controllers. TLS via cert-manager when `ingress.tls.certIssuer` is set.
+- **Gateway API** — `gateway.enabled: true` with `gateway.hostnames` and
+  `gateway.parentRefs` (the Gateway and listener to attach to; the Gateway itself is
+  yours and must allow routes from the chart's namespace). Works with Envoy Gateway,
+  Cilium, Istio, Traefik's Gateway provider and the like.
+
+Whatever fronts ister has to allow three things most proxies limit by default: unbounded
+request bodies (helper nodes upload whole HLS segments and subtitle files), responses that
+run for minutes to hours (HLS playback, a helper node reading a multi-GB source), and
+websocket upgrades on `/api/graphql`. `ingress.controller` (`nginx` | `traefik` |
+`haproxy`) renders the matching annotations from `ingress.proxy`; the HTTPRoute sets
+`timeouts.request: 0s` on the `/api` rule (`gateway.apiTimeouts`). Traefik needs nothing
+per Ingress, but its read timeouts are entrypoint settings
+(`entryPoints.<name>.transport.respondingTimeouts`).
+
+`/.well-known/ister`, the document clients fetch first (instance name, OIDC issuer, API
+URL), is served by the website pod itself (`website.wellKnown`, default on), so it works
+behind any controller, a NodePort or a port-forward. The older ingress-nginx snippet
+(`ingress.wellKnown`) is still there for setups that rely on it.
+
+The Services accept the usual knobs (`server.service`, `website.service`,
+`typesense.service`: `type`, `nodePort`, `annotations`, `loadBalancerIP`, `ipFamilies`,
+...). On an IPv6-primary cluster, give the website and Typesense Services
+`ipFamilyPolicy: SingleStack` / `ipFamilies: [IPv4]` unless the player image is 2.8 or
+newer: older images listen on IPv4 only, and an IPv6-only ClusterIP then answers 503.
 
 ## Operations
 

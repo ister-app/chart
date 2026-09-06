@@ -134,8 +134,13 @@ helm template ister . -f values-production.yaml | kubectl apply --dry-run=server
   you switch `cache.accessMode` to `ReadWriteMany`.
 - PVCs are annotated `helm.sh/resource-policy: keep`, so `helm uninstall` does not delete
   your database. Set `*.retain=false` to opt out.
-- `ingress.wellKnown` renders an ingress-nginx `server-snippet`. Modern ingress-nginx
-  ships with `allow-snippet-annotations=false` and drops it silently.
+- `/.well-known/ister` is served by the website pod (`website.wellKnown`, default on);
+  the ingress-nginx `server-snippet` in `ingress.wellKnown` is the legacy path, and
+  modern ingress-nginx drops it silently (`allow-snippet-annotations=false`).
+- Exposure is either an Ingress (`ingress.*`, with `ingress.controller` rendering the
+  body-size/timeout annotations per controller) or a Gateway API HTTPRoute
+  (`gateway.*`). Helper-node uploads and HLS need unbounded bodies and long timeouts;
+  the docs chapter lists what each proxy needs.
 
 ## Develop
 

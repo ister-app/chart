@@ -1,0 +1,53 @@
+{{- if .Values.gateway.enabled }}
+{{- $fullname := include "ister.fullname" . }}
+{{- if not .Values.gateway.parentRefs }}
+{{- fail "gateway.parentRefs needs at least one entry (the Gateway and listener to attach to)" }}
+{{- end }}
+# Gateway API route: the player at / and the API at server.contextPath, on a Gateway
+# you manage. Same split as templates/ingress.yaml.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: {{ $fullname }}
+  labels:
+    {{- include "ister.labels" (dict "ctx" .) | nindent 4 }}
+  {{- with .Values.gateway.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  parentRefs:
+    {{- toYaml .Values.gateway.parentRefs | nindent 4 }}
+  hostnames:
+    {{- range (required "gateway.hostnames needs at least one entry when gateway.enabled is true" .Values.gateway.hostnames) }}
+    - {{ . | quote }}
+    {{- end }}
+  rules:
+    # Most specific first: /api must not be swallowed by the website's /.
+    - matches:
+        - path:
+            type: PathPrefix
+            value: {{ .Values.server.contextPath }}
+      {{- $t := .Values.gateway.apiTimeouts }}
+      {{- if or $t.request $t.backendRequest }}
+      # Helper-node downloads/uploads and HLS run for minutes to hours; Envoy Gateway's
+      # 15s default cut a helper's source download in half without any error.
+      timeouts:
+        {{- with $t.request }}
+        request: {{ . }}
+        {{- end }}
+        {{- with $t.backendRequest }}
+        backendRequest: {{ . }}
+        {{- end }}
+      {{- end }}
+      backendRefs:
+        - name: {{ $fullname }}-server
+          port: {{ .Values.server.service.port }}
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      backendRefs:
+        - name: {{ $fullname }}-website
+          port: {{ .Values.website.service.port }}
+{{- end }}

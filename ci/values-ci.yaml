@@ -93,6 +93,12 @@ server:
       mountPath: /media/comics
       hostPath: /testdata/node1/disk1/comics
 
+  # The e2e reaches the API through the node port published by ci/kind-config.yaml
+  # (30080 -> :8080); kubectl port-forward collapses under HLS traffic.
+  service:
+    type: NodePort
+    nodePort: 30080
+
 website:
   resources:
     requests:

@@ -92,7 +92,11 @@ cache:
 
 ingress:
   enabled: true
-  className: nginx
+  # Empty = the cluster's default IngressClass. Set it when you run several controllers.
+  className: ""
+  # Renders the body-size/timeout annotations for that controller (nginx | traefik |
+  # haproxy). Or use the Gateway API instead: gateway.enabled with your parentRefs.
+  controller: nginx
   host: ister.example.com
   tls:
     enabled: true
@@ -100,13 +104,9 @@ ingress:
     secretName: ""
     # cert-manager ClusterIssuer; empty means you manage the certificate yourself.
     certIssuer: letsencrypt-production
-  # Serves /.well-known/ister for client discovery. Needs allow-snippet-annotations=true
-  # in ingress-nginx, which is off by default — see README.md.
-  wellKnown:
-    enabled: false
-  annotations:
-    nginx.ingress.kubernetes.io/proxy-body-size: 512m
-    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+  # /.well-known/ister is served by the website pod (website.wellKnown, default on),
+  # so no controller snippet is needed.
+  annotations: {}
 
 database:
   # Needs the CloudNativePG operator. Use mode: external to bring your own PostgreSQL,
