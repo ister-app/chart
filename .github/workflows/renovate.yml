@@ -45,6 +45,17 @@ jobs:
     runs-on: ubuntu-latest
     # The wait can legitimately take hours on a slow GitHub day; the job limit is six.
     timeout-minutes: 330
+    env:
+      RENOVATE_REPOSITORIES: ${{ github.repository }}
+      # Only the repository config (renovate.json) is allowed to steer Renovate.
+      RENOVATE_REQUIRE_CONFIG: required
+      RENOVATE_ONBOARDING: "false"
+      # A fixed identity rather than whatever the token resolves to: the author must stay
+      # stable across runs and tokens — Renovate uses it to tell its own commits from a
+      # human's on the same branch — and GITHUB_TOKEN could not answer /user.
+      RENOVATE_USERNAME: github-actions[bot]
+      RENOVATE_GIT_AUTHOR: github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>
+      LOG_LEVEL: info
     steps:
       - name: Wait for today's server and player releases to finish
         if: github.event_name == 'schedule'
@@ -79,20 +90,19 @@ jobs:
 
       - uses: actions/checkout@v7
 
+      # Three passes, not one: after a branch automerge Renovate restarts its repository job
+      # exactly once and then stops, so a single pass merges at most two branches. A night
+      # with a server release, a player minor, a player major and an actions bump needs four.
+      # An idle pass costs half a minute. The env is on the job so the passes share it.
       - uses: renovatebot/github-action@v46.2.5
         with:
           token: ${{ secrets.RENOVATE_TOKEN || secrets.GITHUB_TOKEN }}
-        env:
-          RENOVATE_REPOSITORIES: ${{ github.repository }}
-          # Only the repository config (renovate.json) is allowed to steer Renovate.
-          RENOVATE_REQUIRE_CONFIG: required
-          RENOVATE_ONBOARDING: "false"
-          # A fixed identity rather than whatever the token resolves to: the author must
-          # stay stable across runs and tokens — Renovate uses it to tell its own commits
-          # from a human's on the same branch — and GITHUB_TOKEN could not answer /user.
-          RENOVATE_USERNAME: github-actions[bot]
-          RENOVATE_GIT_AUTHOR: github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>
-          LOG_LEVEL: info
+      - uses: renovatebot/github-action@v46.2.5
+        with:
+          token: ${{ secrets.RENOVATE_TOKEN || secrets.GITHUB_TOKEN }}
+      - uses: renovatebot/github-action@v46.2.5
+        with:
+          token: ${{ secrets.RENOVATE_TOKEN || secrets.GITHUB_TOKEN }}
 
       # A push made with GITHUB_TOKEN never triggers another workflow, and release.yml has
       # no schedule of its own any more — this is the daily release. force=false leaves the
