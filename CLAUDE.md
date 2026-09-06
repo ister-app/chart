@@ -12,8 +12,6 @@ are published to `ghcr.io/ister-app/*`.
 ## Commands
 
 ```sh
-helm dependency build                                  # required first — pulls the RabbitMQ subchart
-
 helm lint . -f values-dev.yaml --set server.tmdbApiKey=x
 helm template ister . -f ci/values-ci.yaml             # values.schema.json is enforced on every render
 helm package .
@@ -85,10 +83,10 @@ map and prefers the digest. Every image in the chart — including the Flyway wa
 That is load-bearing: Renovate's `helm-values` manager only sees the structured form, and only in
 `values.yaml`.
 
-**The RabbitMQ subchart's resource names are reproduced** in `_helpers.tpl`
-(`ister.rabbitmqSubchartFullname`) because its Service and Secret are named by *its* fullname
-template, not ours. It also pins `bitnamilegacy/rabbitmq` + `allowInsecureImages`, because Bitnami
-stopped publishing to `docker.io/bitnami` and the subchart's own default tag 404s.
+**RabbitMQ is the chart's own StatefulSet** (`templates/rabbitmq.yaml`, official `rabbitmq` image),
+not a subchart any more: the Bitnami chart had to be pinned to the unmaintained `bitnamilegacy`
+mirror. Its Secret (`rabbitmq-password`, `rabbitmq-erlang-cookie`) is generated and preserved
+like the others. There are no chart dependencies left, so `helm dependency build` is a no-op.
 
 ## Releasing
 

@@ -1,6 +1,6 @@
 apiVersion: v2
 name: ister
-description: Ister media server — Spring Boot backend + web frontend, with PostgreSQL, RabbitMQ and Typesense
+description: Ister media server — Spring Boot backend + web frontend, with PostgreSQL, RabbitMQ and Typesense (all bundled or external)
 type: application
 kubeVersion: ">=1.25.0-0"
 
@@ -21,11 +21,3 @@ keywords:
   - media
   - media-server
   - streaming
-
-dependencies:
-  # Bitnami RabbitMQ. Enabled by default; set rabbitmq.enabled=false and fill in
-  # externalRabbitmq.* to point at an existing broker instead.
-  - name: rabbitmq
-    version: "16.0.14"
-    repository: oci://registry-1.docker.io/bitnamicharts
-    condition: rabbitmq.enabled

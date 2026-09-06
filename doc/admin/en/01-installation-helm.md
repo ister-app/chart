@@ -15,7 +15,7 @@ bring your own — PostgreSQL, RabbitMQ and Typesense.
 | server | The Spring Boot backend (`ghcr.io/ister-app/server`) | always |
 | website | The web player (`ghcr.io/ister-app/player`) | always |
 | PostgreSQL | The database | yes (`database.mode: internal`) |
-| RabbitMQ | The message broker (Bitnami subchart) | yes (`rabbitmq.enabled: true`) |
+| RabbitMQ | The message broker (official image, single node) | yes (`rabbitmq.enabled: true`) |
 | Typesense | The search engine | yes (`typesense.enabled: true`) |
 | Flyway | Database migrations (`ghcr.io/ister-app/migrations`) | runs as an init container |
 
@@ -68,9 +68,16 @@ Secret already does.
 
 ### RabbitMQ — `rabbitmq.enabled`
 
-`true` deploys the Bitnami RabbitMQ subchart (everything under `rabbitmq:` is passed
-straight to it). `false` uses the `externalRabbitmq` block instead — its `existingSecret`
-needs the key `rabbitmq-password`.
+`true` deploys a single-node RabbitMQ StatefulSet on the official `rabbitmq` image
+(ister only uses the broker for pass-through work, so nothing needs clustering); the
+password and Erlang cookie are generated once, or come from `rabbitmq.auth.existingSecret`
+(keys `rabbitmq-password`, `rabbitmq-erlang-cookie`). `false` uses the `externalRabbitmq`
+block instead — its `existingSecret` needs the key `rabbitmq-password`.
+
+Upgrading from a chart before 1.0, which shipped the Bitnami subchart: the old
+StatefulSet, Service and PVC named `<release>-rabbitmq` are not adopted. Delete them (the
+queues hold pass-through work only) before upgrading, or run the upgrade and delete the
+leftover PVC afterwards; the server reconnects to the new broker on its own.
 
 ### Typesense — `typesense.enabled`
 

@@ -4,7 +4,7 @@ Components:
   server     {{ include "ister.image" (dict "ctx" . "image" .Values.server.image) }}
   website    {{ include "ister.image" (dict "ctx" . "image" .Values.website.image) }}
   database   {{ .Values.database.mode }}{{ if eq .Values.database.mode "cnpg" }} ({{ .Values.database.cnpg.instances }} instances, backups {{ if .Values.database.cnpg.backup.enabled }}on{{ else }}off{{ end }}){{ end }}
-  rabbitmq   {{ if .Values.rabbitmq.enabled }}bundled subchart{{ else }}external ({{ .Values.externalRabbitmq.host }}){{ end }}
+  rabbitmq   {{ if .Values.rabbitmq.enabled }}bundled{{ else }}external ({{ .Values.externalRabbitmq.host }}){{ end }}
   typesense  {{ if .Values.typesense.enabled }}bundled{{ else if .Values.typesense.external.host }}external ({{ .Values.typesense.external.host }}){{ else }}disabled{{ end }}
 
 Reach it:

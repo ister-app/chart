@@ -124,12 +124,6 @@ rabbitmq:
   enabled: true
   persistence:
     enabled: false
-  resources:
-    requests:
-      cpu: 50m
-      memory: 256Mi
-    limits:
-      memory: 768Mi
 
 typesense:
   enabled: true

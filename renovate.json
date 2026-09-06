@@ -16,7 +16,7 @@
   "semanticCommitScope": "deps",
   "packageRules": [
     {
-      "description": "Third-party images and the RabbitMQ subchart: automerge patches only. A minor bump of Postgres or Typesense is a real upgrade of a stateful component, so it gets a human.",
+      "description": "Third-party images: automerge patches only. A minor bump of Postgres, RabbitMQ or Typesense is a real upgrade of a stateful component, so it gets a human.",
       "matchDatasources": [
         "docker",
         "helm"
