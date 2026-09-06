@@ -3,6 +3,7 @@
 {{- $secret := include "ister.databaseSecretName" . }}
 # A single-replica PostgreSQL with no backups and no failover.
 # Fine for development; use database.mode=cnpg or external for anything real.
+{{- if not .Values.database.internal.existingClaim }}
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
@@ -24,6 +25,7 @@ spec:
     requests:
       storage: {{ .Values.database.internal.storageSize }}
 ---
+{{- end }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:

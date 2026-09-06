@@ -229,6 +229,8 @@ database:
     storageClass: ""
     storageSize: 8Gi
     retain: true
+    # Use a pre-existing PVC for PGDATA instead of creating one.
+    existingClaim: ""
 
     # Run as the image's own postgres user (uid 999). The entrypoint chmods
     # /var/run/postgresql and chowns PGDATA; as root with capabilities dropped those
@@ -341,6 +343,7 @@ rabbitmq:
 
 externalRabbitmq:
   host: ""
+  # Rendered as SPRING_RABBITMQ_PORT.
   port: 5672
   user: user
   password: ""
@@ -389,7 +392,10 @@ typesense:
   # Used only when enabled: false.
   external:
     host: ""
+    port: 8108
     protocol: http
+    # Provide via existingSecret (key: api-key); apiKey is the --set escape hatch.
+    apiKey: ""
     existingSecret: ""
 
 # ============================================================

@@ -121,6 +121,10 @@ its Service and Secret are named by *its* fullname template, not ours.
 {{- end -}}
 {{- end }}
 
+{{- define "ister.rabbitmqPort" -}}
+{{- if .Values.rabbitmq.enabled -}}5672{{- else -}}{{ .Values.externalRabbitmq.port }}{{- end -}}
+{{- end }}
+
 {{- define "ister.rabbitmqUser" -}}
 {{- if .Values.rabbitmq.enabled -}}
 {{- .Values.rabbitmq.auth.username -}}

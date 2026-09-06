@@ -87,7 +87,12 @@ spec:
             {{- toYaml .Values.flyway.resources | nindent 12 }}
         {{- if .Values.flyway.enabled }}
         - name: flyway
-          image: {{ include "ister.image" (dict "ctx" . "image" .Values.flyway.image) | quote }}
+          {{- /* migrations publishes the same semver as the server. An empty tag follows
+                 server.image.tag rather than .Chart.AppVersion, so a chart installed straight
+                 from git (where appVersion only catches up at release time) still migrates
+                 with the schema the deployed server expects. */}}
+          {{- $flywayImage := merge (dict "tag" (default .Values.server.image.tag .Values.flyway.image.tag)) .Values.flyway.image }}
+          image: {{ include "ister.image" (dict "ctx" . "image" $flywayImage) | quote }}
           imagePullPolicy: {{ .Values.flyway.image.pullPolicy }}
           securityContext:
             {{- toYaml .Values.server.securityContext | nindent 12 }}
@@ -209,6 +214,8 @@ spec:
             # --- RabbitMQ
             - name: SPRING_RABBITMQ_HOST
               value: {{ include "ister.rabbitmqHost" . | quote }}
+            - name: SPRING_RABBITMQ_PORT
+              value: {{ include "ister.rabbitmqPort" . | quote }}
             - name: SPRING_RABBITMQ_USERNAME
               value: {{ include "ister.rabbitmqUser" . | quote }}
             - name: SPRING_RABBITMQ_PASSWORD
@@ -223,7 +230,7 @@ spec:
             - name: TYPESENSE_HOST
               value: {{ include "ister.typesenseHost" . | quote }}
             - name: TYPESENSE_PORT
-              value: {{ .Values.typesense.port | quote }}
+              value: {{ ternary .Values.typesense.port .Values.typesense.external.port .Values.typesense.enabled | quote }}
             - name: TYPESENSE_PROTOCOL
               value: {{ ternary "http" .Values.typesense.external.protocol .Values.typesense.enabled | quote }}
             - name: TYPESENSE_COLLECTION
