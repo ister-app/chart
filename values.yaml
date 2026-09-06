@@ -145,7 +145,7 @@ website:
   image:
     repository: ghcr.io/ister-app/player
     # Versioned independently of the server — see the note on server.image.tag.
-    tag: "1.19.0"
+    tag: "2.7.1"
     digest: ""
     pullPolicy: IfNotPresent
   replicaCount: 1
