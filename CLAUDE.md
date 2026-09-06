@@ -85,15 +85,25 @@ stopped publishing to `docker.io/bitnami` and the subchart's own default tag 404
 
 Automatic, and the details matter before you touch `Chart.yaml`:
 
-- **One release per day**, on a schedule (`cron: "0 5 * * *"` — 07:00 Amsterdam in summer, 06:00
-  in winter), not per push. A `changes` job diffs `Chart.yaml`, `values.yaml`,
+- **Once a day, after the apps.** `release.yml` has no schedule of its own; it only runs on
+  `workflow_dispatch`, and `.github/workflows/renovate.yml` dispatches it once a day (cron
+  06:00 UTC, which GitHub starts hours late in practice). Before that, `renovate.yml` polls the
+  public `release.yml` runs of `ister-app/server` and `ister-app/player` until today's have
+  finished (up to 4h, then it goes ahead anyway), so a night on which both released yields one
+  chart version, not two. A `changes` job in `release.yml` diffs `Chart.yaml`, `values.yaml`,
   `values.schema.json`, `templates/` and `doc/` against the previous tag and skips the whole
-  workflow when nothing moved, so an idle day tags nothing. `workflow_dispatch` releases on the
-  spot. Everything that landed since the previous tag ships as one version.
-- **Renovate does not open PRs.** `automergeType: "branch"` in `renovate.json` means an automerged
-  bump lands as a `renovate/*` branch that Renovate fast-forwards into main once CI on that branch
-  is green — which is why `ci.yml` triggers on `renovate/**` pushes and *not* on pushes to main
-  (the merged SHA was already tested). Majors keep `automerge: false` and still get a PR.
+  workflow when nothing moved (`force=false`, what `renovate.yml` passes; the Actions-tab
+  button defaults to `force=true`). Everything since the previous tag ships as one version,
+  after the full CI passes on main.
+- **Renovate is self-hosted** (`renovate.yml`, on the `RENOVATE_TOKEN` PAT secret with `repo` +
+  `workflow` scope, falling back to `GITHUB_TOKEN`), not the Mend app, and it does not open
+  PRs: `automergeType: "branch"` + `ignoreTests: true` in `renovate.json` means an automerged
+  bump is pushed as a `renovate/*` branch and fast-forwarded into main in the same run,
+  untested. The release is the gate. `ci.yml` has no push trigger. First-party
+  (`ghcr.io/ister-app/*`) bumps automerge at every level, majors included; third-party majors
+  keep `automerge: false` and still get a PR (rule order in `packageRules` matters there).
+  Action bumps are `chore(deps)` and grouped, and they need the PAT: `GITHUB_TOKEN` may not
+  edit `.github/workflows/`.
 - `Chart.yaml` `version` and `appVersion` are **written by `.github/workflows/release.yml`** — never
   bump them by hand. `appVersion` is derived from `values.yaml` `server.image.tag`.
 - The bump level comes from the commit messages since the last tag: `feat!`/`BREAKING CHANGE` →

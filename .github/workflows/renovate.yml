@@ -1,0 +1,104 @@
+name: Renovate
+
+# Self-hosted Renovate, instead of the Mend-hosted GitHub App. The app could only merge its
+# branches once a status check on them went green, and that never happened reliably — the
+# chart sat months behind the server and player releases. Here Renovate runs on our own
+# runner and, per renovate.json (automergeType: branch + ignoreTests), fast-forwards main
+# itself without waiting for anything. The safety net moved to release.yml, which runs the
+# full CI on main before it publishes a chart.
+#
+# This is also the only thing that starts a release on a normal day. The server and player
+# release nightly (02:00 and 04:00 UTC by their crons — in practice GitHub starts those
+# four to five hours late, and the player's takes up to half an hour). Rather than guess a
+# time, the first step looks at both repos' release.yml runs and waits until today's have
+# finished. Only then does Renovate run, picking up whatever both released, and one chart
+# release follows for the pair — not one per image.
+#
+# It runs on the RENOVATE_TOKEN secret, a PAT with the `repo` and `workflow` scopes. The
+# repository's own GITHUB_TOKEN may not push changes under .github/workflows/, which the
+# github-actions manager needs, and its pushes never start another workflow. The PAT's
+# pushes would, but ci.yml has no push trigger left, so nothing runs twice; the release is
+# still dispatched explicitly by the last step because release.yml has no push trigger
+# either. Should the secret go missing, GITHUB_TOKEN takes over and only the action bumps
+# start failing.
+on:
+  schedule:
+    # 06:00 UTC: after both app crons even if they ran on time, and the wait below covers
+    # the day they do not. Expect the run itself to start hours later, like theirs.
+    - cron: "0 6 * * *"
+  # By hand: skips the wait.
+  workflow_dispatch:
+
+# Two runs racing would both try to push main.
+concurrency:
+  group: renovate
+  cancel-in-progress: false
+
+permissions:
+  contents: write         # push the bump branches and fast-forward main
+  issues: write           # the dependency dashboard
+  pull-requests: write    # third-party majors still get a PR
+  actions: write          # gh workflow run release.yml (reading the other repos' runs needs nothing: they are public)
+
+jobs:
+  renovate:
+    runs-on: ubuntu-latest
+    # The wait can legitimately take hours on a slow GitHub day; the job limit is six.
+    timeout-minutes: 330
+    steps:
+      - name: Wait for today's server and player releases to finish
+        if: github.event_name == 'schedule'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          today=$(date -u +%F)
+          deadline=$(( $(date +%s) + 4 * 3600 ))
+          for repo in ister-app/server ister-app/player; do
+            while :; do
+              runs=$(gh run list --repo "$repo" --workflow release.yml --limit 5 \
+                --json status,createdAt)
+              # Done: a run created today (UTC) that has completed, and nothing still going.
+              # Any event counts — a release cut by hand is a release too.
+              if jq -e --arg d "$today" \
+                  'any(.[]; .createdAt >= $d and .status == "completed")
+                   and all(.[]; .status == "completed")' <<<"$runs" >/dev/null; then
+                echo "$repo: released today"
+                break
+              fi
+              if [ "$(date +%s)" -ge "$deadline" ]; then
+                # A schedule GitHub never fired (it disables them on idle repos), or a
+                # release that hung. Better a chart with yesterday's images than none;
+                # tomorrow's run picks up the rest.
+                echo "::warning::$repo has no finished release today after 4h; continuing"
+                break
+              fi
+              echo "$repo: no finished release yet today, checking again in 5 minutes"
+              sleep 300
+            done
+          done
+
+      - uses: actions/checkout@v7
+
+      - uses: renovatebot/github-action@v46.2.5
+        with:
+          token: ${{ secrets.RENOVATE_TOKEN || secrets.GITHUB_TOKEN }}
+        env:
+          RENOVATE_REPOSITORIES: ${{ github.repository }}
+          # Only the repository config (renovate.json) is allowed to steer Renovate.
+          RENOVATE_REQUIRE_CONFIG: required
+          RENOVATE_ONBOARDING: "false"
+          # A fixed identity rather than whatever the token resolves to: the author must
+          # stay stable across runs and tokens — Renovate uses it to tell its own commits
+          # from a human's on the same branch — and GITHUB_TOKEN could not answer /user.
+          RENOVATE_USERNAME: github-actions[bot]
+          RENOVATE_GIT_AUTHOR: github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>
+          LOG_LEVEL: info
+
+      # A push made with GITHUB_TOKEN never triggers another workflow, and release.yml has
+      # no schedule of its own any more — this is the daily release. force=false leaves the
+      # decision to release.yml's `changes` job: it diffs main against the previous tag, so
+      # a hand-pushed template change ships too, and a day where nothing moved tags nothing.
+      - name: Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh workflow run release.yml --ref main -f force=false

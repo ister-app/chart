@@ -1,16 +1,12 @@
 name: Release
 
-# One release per day, collecting everything that landed on main since the previous tag:
-# bump Chart.yaml, package, push to ghcr as an OCI artifact, tag, and cut a GitHub Release
-# with notes built from the commits. Renovate's image bumps merge themselves onto main
-# without a PR (renovate.json), so a night of bumps ships as a single chart version with no
-# human step in between.
+# Collect everything that landed on main since the previous tag: bump Chart.yaml, package,
+# push to ghcr as an OCI artifact, tag, and cut a GitHub Release with notes built from the
+# commits. No schedule of its own: renovate.yml dispatches this once a day, after it has
+# waited for the server and player releases and merged their bumps — so a night on which
+# both released is one chart version, not two. A human can run it from the Actions tab as
+# well. Either way the full CI runs first.
 on:
-  schedule:
-    # 05:00 UTC — GitHub cron has no timezone, so that is 07:00 Amsterdam in summer and 06:00
-    # in winter. Renovate's window (renovate.json) closes at 05:00 local, leaving its last
-    # automerge time to go green before this runs.
-    - cron: "0 5 * * *"
   workflow_dispatch:
     inputs:
       bump:
@@ -18,6 +14,10 @@ on:
         type: choice
         default: auto
         options: [auto, patch, minor, major]
+      force:
+        description: Release even if nothing shippable changed since the last tag
+        type: boolean
+        default: true
 
 # Two releases racing would fight over the tag and the main commit.
 concurrency:
@@ -29,10 +29,11 @@ permissions:
   packages: write   # helm push to ghcr
 
 jobs:
-  # Most nights there is nothing to ship. Rather than tag an identical chart every morning,
-  # look at what changed since the previous tag — the same set of paths that used to be the
-  # push filter. This also makes the workflow self-guarding: its own `chore(release):` commit
+  # Most days there is nothing to ship. Rather than tag an identical chart every day, look
+  # at what changed since the previous tag — the same set of paths that used to be the push
+  # filter. This also makes the workflow self-guarding: its own `chore(release):` commit
   # touches Chart.yaml, but the tag sits on that commit, so the diff below is empty.
+  # renovate.yml passes force=false; the button in the Actions tab defaults to true.
   changes:
     runs-on: ubuntu-latest
     outputs:
@@ -44,7 +45,7 @@ jobs:
 
       - id: check
         run: |
-          if [ "${{ github.event_name }}" = workflow_dispatch ]; then
+          if [ "${{ inputs.force }}" = true ]; then
             echo "release=true" >> "$GITHUB_OUTPUT"
             echo "::notice::released on request"
             exit 0

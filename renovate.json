@@ -7,40 +7,56 @@
   ],
   "timezone": "Europe/Amsterdam",
   "description": [
-    "No pull requests. Everything with automerge below lands as a renovate/* branch that Renovate fast-forwards into main once CI on that branch is green -- which is why .github/workflows/ci.yml triggers on renovate/** pushes. Without a status check on the branch Renovate would merge it unverified. Majors keep automerge:false and still open a PR.",
-    "The schedule window closes at 05:00 local so an automerged bump still has ~2h of runway before the 05:00 UTC release in .github/workflows/release.yml: the branch has to go green through the full e2e (~35 min) first."
+    "Run by .github/workflows/renovate.yml (self-hosted, once a day after the server and player releases, RENOVATE_TOKEN), not by the Mend GitHub App.",
+    "No pull requests, no waiting: automergeType branch plus ignoreTests means an automerged bump is pushed as a renovate/* branch and fast-forwarded into main in the same run. Nothing tests the branch itself -- the release (release.yml) runs the full CI on main before it publishes, so a bad bump fails the release rather than ships. Third-party majors keep automerge:false and still open a PR; first-party (ghcr.io/ister-app) majors automerge too."
   ],
-  "schedule": ["* 0-4 * * *"],
   "automergeType": "branch",
-
+  "ignoreTests": true,
   "semanticCommitType": "fix",
   "semanticCommitScope": "deps",
-
   "packageRules": [
     {
       "description": "Third-party images and the RabbitMQ subchart: automerge patches only. A minor bump of Postgres or Typesense is a real upgrade of a stateful component, so it gets a human.",
-      "matchDatasources": ["docker", "helm"],
-      "matchUpdateTypes": ["patch", "digest"],
+      "matchDatasources": [
+        "docker",
+        "helm"
+      ],
+      "matchUpdateTypes": [
+        "patch",
+        "digest"
+      ],
       "automerge": true
     },
     {
-      "description": "First-party ister images. Each gets its own PR and its own version line — server, player and migrations do not move in lockstep.",
-      "matchDatasources": ["docker"],
-      "matchPackageNames": ["ghcr.io/ister-app/**"],
-      "matchUpdateTypes": ["minor", "patch"],
-      "automerge": true
+      "description": "Third-party majors are never automerged. They land on the dependency dashboard and wait for a human. Rules are applied in order, so this sits before the first-party rule below, which overrides it.",
+      "matchUpdateTypes": [
+        "major"
+      ],
+      "automerge": false
     },
     {
-      "description": "GitHub Actions. Grouped, and chore(deps) rather than fix(deps) so a bumped action does not release a new chart — see .github/workflows/release.yml.",
-      "matchManagers": ["github-actions"],
+      "description": "GitHub Actions. Grouped, and chore(deps) rather than fix(deps) so a bumped action does not release a new chart -- .github/ is not among the paths release.yml diffs. Needs the RENOVATE_TOKEN PAT with the workflow scope: GITHUB_TOKEN may not push changes under .github/workflows/.",
+      "matchManagers": [
+        "github-actions"
+      ],
       "groupName": "github actions",
       "semanticCommitType": "chore",
       "automerge": true
     },
     {
-      "description": "Majors are never automerged. They land on the dependency dashboard and wait for a human.",
-      "matchUpdateTypes": ["major"],
-      "automerge": false
+      "description": "First-party ister images: every server or player release, majors included, becomes a chart release -- the chart pins them independently and the release e2e is the gate, so a first-party major that needs a chart change fails the release (and blocks the following ones) until the chart catches up. Each image gets its own branch and its own version line; server, player and migrations do not move in lockstep.",
+      "matchDatasources": [
+        "docker"
+      ],
+      "matchPackageNames": [
+        "ghcr.io/ister-app/**"
+      ],
+      "matchUpdateTypes": [
+        "major",
+        "minor",
+        "patch"
+      ],
+      "automerge": true
     }
   ]
 }

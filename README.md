@@ -147,18 +147,21 @@ helm test ister -n ister
 
 ## Releasing
 
-Releases are automatic. Merging anything that touches the chart (`Chart.yaml`, `values.yaml`,
-`values.schema.json`, `templates/`) runs `.github/workflows/release.yml`, which re-runs the
-full CI on the merged commit and only then bumps, packages, pushes and publishes:
+Releases are automatic and daily. `.github/workflows/renovate.yml` waits for the server and
+player releases of the day, merges their bumps, and then dispatches
+`.github/workflows/release.yml`; if anything that touches the chart (`Chart.yaml`,
+`values.yaml`, `values.schema.json`, `templates/`, `doc/`) landed since the previous tag, that
+re-runs the full CI on main and only then bumps, packages, pushes and publishes:
 
 | commit | chart bump |
 |---|---|
 | `feat(...)!:` or `BREAKING CHANGE:` in the body | major |
 | `feat:` | minor |
 | everything else, including Renovate's `fix(deps):` | patch |
-| `chore(deps):` (GitHub Actions bumps) | no release — `.github/` is not in the trigger paths |
+| anything under `.github/` only | no release — not in the diffed paths |
 
-`workflow_dispatch` takes an explicit `bump` if you need to override that.
+Running it from the Actions tab takes an explicit `bump` to override that, and releases even
+when nothing changed (`force`, on by default there).
 
 The workflow writes the new version into `Chart.yaml`, sets `appVersion` to the **server**
 image tag, generates the release notes, pushes `oci://ghcr.io/ister-app/charts/ister`, tags
@@ -183,10 +186,19 @@ Three versions, three meanings:
 
 ### Renovate
 
-`renovate.json` keeps every image tag in `values.yaml`, the RabbitMQ subchart in `Chart.yaml`
-and the pinned GitHub Actions up to date. Each image gets its own PR, CI (including the kind
-e2e) runs on it, and patch/minor bumps automerge — so a new server release becomes a new chart
-release without a human in the loop. Majors wait on the dependency dashboard.
+Renovate runs self-hosted from `.github/workflows/renovate.yml` on the `RENOVATE_TOKEN`
+repository secret — not the Mend GitHub App. It runs once a day (cron 06:00 UTC, though
+GitHub starts scheduled runs on these repos hours late), and first polls the `release.yml`
+runs of `ister-app/server` and `ister-app/player` until today's have finished, so a night on
+which both released becomes one chart release rather than two. `renovate.json` keeps every
+image tag in `values.yaml`, the RabbitMQ subchart in `Chart.yaml` and the pinned GitHub
+Actions up to date. There are no PRs for patch/minor bumps: Renovate pushes a `renovate/*`
+branch and fast-forwards `main` in the same run, without waiting for checks. The workflow
+then dispatches `release.yml`, which runs the full CI (including the kind e2e) on `main`
+before it publishes — a bump that breaks the e2e fails the release instead of shipping.
+That goes for majors of the ister images too: a new server or player major is still a new
+chart. Majors of third-party images (Postgres, Typesense, the RabbitMQ subchart) wait on the
+dependency dashboard as a PR.
 
 Renovate rather than Dependabot because Dependabot's docker manager cannot tell two images in
 one `values.yaml` apart when they carry the same tag string
@@ -194,28 +206,15 @@ one `values.yaml` apart when they carry the same tag string
 not planned) — it bumps both. With independent version lines for server and player, that breaks
 the moment the two happen to land on the same version.
 
-**Two things still have to be set up for this to work:**
+Two bits of setup:
 
-1. **The app repos must publish semver tags.** `server` and `player` now do, and `values.yaml`
-   pins both at `1.0.0` with Renovate taking over from there. `ghcr.io/ister-app/migrations`
-   still publishes only `:main`, which is why its `tag` stays `"main"` — there is no version to
-   pin to yet. To fix it, add semver tags to the migrations publish workflow the same way:
-
-   ```yaml
-   - uses: docker/metadata-action@v5
-     with:
-       images: ghcr.io/ister-app/migrations
-       tags: |
-         type=semver,pattern={{version}}
-         type=semver,pattern={{major}}.{{minor}}
-         type=ref,event=branch          # keeps publishing :main for dev
-   ```
-
-   Then set the tag in `values.yaml` to that first release once, and Renovate takes it from there.
-
-2. **Repo settings.** Install the Renovate GitHub App on the org; enable "Allow auto-merge";
-   protect `main` with CI as a required check, and let `github-actions` bypass it — the
-   release workflow pushes the `chore(release):` commit back to `main`.
+1. **`RENOVATE_TOKEN`**: a PAT with the `repo` and `workflow` scopes, stored as a repository
+   secret. `workflow` is what lets Renovate bump the pinned actions — the repository's own
+   `GITHUB_TOKEN` may not push changes under `.github/workflows/`, and is only the fallback.
+   With `gh` logged in with those scopes: `gh secret set RENOVATE_TOKEN --body "$(gh auth token)"`.
+2. **Repo settings**: "Allow GitHub Actions to create and approve pull requests" for the
+   third-party major PRs, and if `main` is protected, `github-actions` allowed to push to it —
+   both Renovate and the release commit do.
 
 ## CI
 

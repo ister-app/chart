@@ -1,14 +1,11 @@
 name: CI
 
 on:
-  # Renovate merges without a PR (automergeType: branch in renovate.json), so its branches are
-  # the only place its bumps get tested — without a status check here Renovate would merge them
-  # unverified. main is deliberately absent: a bump is fast-forwarded onto main after it went
-  # green here, so a run on main would re-test the very same SHA for another 35 minutes. A
-  # hand-pushed commit on main is covered by the nightly release, which runs these jobs through
-  # workflow_call before it publishes anything.
-  push:
-    branches: ['renovate/**']
+  # No push trigger on purpose. Renovate fast-forwards main without a PR and without waiting
+  # for checks (renovate.json), and its pushes are made with GITHUB_TOKEN, which never starts
+  # a workflow anyway. Everything that lands on main is tested by the release instead, which
+  # runs these jobs through workflow_call before it publishes anything — either right after a
+  # Renovate merge (renovate.yml dispatches it) or on the nightly schedule.
   pull_request:
   workflow_dispatch:
   # release.yml runs these same jobs on the merged commit before it publishes anything,
@@ -23,12 +20,12 @@ on:
     # repo, so catch it on a schedule rather than on the next release.
     - cron: "0 5 * * 1"
 
-# Renovate rebases its branches whenever main moves; without this every rebase leaves another
-# 35-minute e2e running against a SHA nobody will merge. event_name is part of the group so the
-# workflow_call run from release.yml (also on main) never queues behind or cancels anything else.
+# A force-push to a PR branch should not leave another 35-minute e2e running against a SHA
+# nobody will merge. event_name is part of the group so the workflow_call run from release.yml
+# (also on main) never queues behind or cancels anything else.
 concurrency:
   group: ci-${{ github.event_name }}-${{ github.ref }}
-  cancel-in-progress: ${{ startsWith(github.ref, 'refs/heads/renovate/') }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   HELM_VERSION: v3.21.3
