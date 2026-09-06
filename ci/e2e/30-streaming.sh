@@ -16,9 +16,16 @@ MOVIE_MEDIA_FILE_ID=$(gql '{ movies(size: 1) { content { name mediaFile { id } }
 export MOVIE_MEDIA_FILE_ID
 echo "    mediaFileId: $MOVIE_MEDIA_FILE_ID"
 
-echo "--> Fetching the master playlist"
-master=$(api_curl "$API/hls/$MOVIE_MEDIA_FILE_ID/master.m3u8?token=$stream_token")
-echo "$master" | head -1 | grep -q '#EXTM3U' || fail "master playlist is not m3u8: $master"
+# The server generates the playlists on the first request and holds the request until they
+# exist, which on a busy runner (the scan's per-file analysis is still running) can exceed
+# its own wait and come back as a 5xx. Poll rather than fail on the first answer; the
+# ingress variants of the e2e run this scenario straight after the scan.
+echo "--> Fetching the master playlist (up to ${MASTER_TIMEOUT_SECONDS:-300}s)"
+fetch_master() {
+  master=$(api_curl "$API/hls/$MOVIE_MEDIA_FILE_ID/master.m3u8?token=$stream_token" 2>/dev/null) || return 1
+  echo "$master" | head -1 | grep -q '#EXTM3U'
+}
+poll_until "${MASTER_TIMEOUT_SECONDS:-300}" "master playlist" fetch_master
 
 # The master playlist references variant playlists; their URIs already carry ?token=.
 variant_path=$(echo "$master" | grep -v '^#' | grep '\.m3u8' | head -1)
