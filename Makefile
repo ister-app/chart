@@ -7,12 +7,13 @@
 #   make down        — delete the kind cluster
 
 CLUSTER_NAME ?= ister
+EXPOSURE     ?= nodeport
 NAMESPACE    ?= ister
 RELEASE      ?= ister
 TESTDATA_DIR ?= $(abspath ../testdata)
 PLAYER_DIR   ?= $(abspath ../player)
 
-.PHONY: fixtures up e2e player-e2e down
+.PHONY: fixtures up e2e e2e-ingress player-e2e down
 
 fixtures:
 	cd $(TESTDATA_DIR) && ./create_mkv.sh || true
@@ -21,15 +22,21 @@ fixtures:
 # Image pinning is passed through to ci/up.sh; default is the chart's own pinned version.
 #   make up SERVER_IMAGE_TAG=1.2.0-snapshot
 #   make up SERVER_IMAGE_REPOSITORY=localhost/ister-server SERVER_IMAGE_TAG=dev SERVER_IMAGE_PULL_POLICY=Never
+#   make up EXPOSURE=ingress-nginx      # also installs ingress-nginx; then: make e2e-ingress
 up:
 	TESTDATA_DIR=$(TESTDATA_DIR) CLUSTER_NAME=$(CLUSTER_NAME) NAMESPACE=$(NAMESPACE) RELEASE=$(RELEASE) \
 	SERVER_IMAGE_REPOSITORY=$(SERVER_IMAGE_REPOSITORY) SERVER_IMAGE_TAG=$(SERVER_IMAGE_TAG) \
 	SERVER_IMAGE_PULL_POLICY=$(SERVER_IMAGE_PULL_POLICY) \
 	MIGRATIONS_IMAGE_REPOSITORY=$(MIGRATIONS_IMAGE_REPOSITORY) MIGRATIONS_IMAGE_TAG=$(MIGRATIONS_IMAGE_TAG) \
+	EXPOSURE=$(EXPOSURE) \
 	ci/up.sh
 
 e2e:
 	ci/e2e.sh $(RELEASE) $(NAMESPACE)
+
+# Through the ingress-nginx installed by `make up EXPOSURE=ingress-nginx` (host port 8090).
+e2e-ingress:
+	E2E_API_URL=http://ister.test:8090/api E2E_CURL_ARGS="--resolve ister.test:8090:127.0.0.1" ci/e2e.sh $(RELEASE) $(NAMESPACE)
 
 # Starts the forwards, runs the integration tests, and tears the forwards down.
 player-e2e:

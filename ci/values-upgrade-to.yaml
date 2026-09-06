@@ -1,0 +1,28 @@
+# The working-tree chart, upgraded over ci/values-upgrade-from.yaml. Same install, this
+# chart's keys.
+server:
+  name: upgrade
+  tmdbApiKey: mock-key
+  oidc:
+    url: http://mock-oidc:8080/default
+  resources:
+    requests: {cpu: 100m, memory: 512Mi}
+    limits: {memory: 3Gi}
+  probes:
+    startup: {failureThreshold: 60, periodSeconds: 5}
+cache:
+  size: 1Gi
+  retain: false
+database:
+  mode: internal
+  internal:
+    storageSize: 1Gi
+    retain: false
+rabbitmq:
+  enabled: true
+  persistence:
+    enabled: false
+typesense:
+  enabled: true
+  persistence:
+    enabled: false

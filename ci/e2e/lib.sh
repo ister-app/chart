@@ -7,6 +7,14 @@
 
 fail() { echo "FAIL: $*" >&2; exit 1; }
 
+# curl against the API with the transport-specific extras from E2E_CURL_ARGS, e.g.
+# "--resolve ister.test:8090:127.0.0.1" when the e2e goes through an ingress on a
+# hostname that does not resolve on the runner. Word-split on purpose.
+api_curl() {
+  # shellcheck disable=SC2086
+  curl ${E2E_CURL_ARGS:-} -fsS "$@"
+}
+
 forward() { # svc port -> localhost port
   kubectl port-forward -n "$NAMESPACE" "svc/$1" "$3:$2" >/dev/null 2>&1 &
   PIDS+=($!)
@@ -14,7 +22,7 @@ forward() { # svc port -> localhost port
 
 wait_for() { # url
   for _ in $(seq 1 30); do
-    curl -fsS -o /dev/null "$1" 2>/dev/null && return 0
+    api_curl -o /dev/null "$1" 2>/dev/null && return 0
     sleep 1
   done
   return 1
@@ -25,7 +33,7 @@ gql() { # query [token]
   local body auth=()
   body=$(jq -n --arg q "$1" '{query: $q}')
   [ -n "${2:-$TOKEN}" ] && auth=(-H "Authorization: Bearer ${2:-$TOKEN}")
-  curl -fsS -X POST "$API/graphql" \
+  api_curl -X POST "$API/graphql" \
     -H 'Content-Type: application/json' \
     "${auth[@]}" \
     -d "$body"
@@ -36,7 +44,7 @@ gql() { # query [token]
 rest() { # method path [curl args...]
   local method="$1" path="$2"
   shift 2
-  curl -fsS -X "$method" "$API$path" -H "Authorization: Bearer $TOKEN" "$@"
+  api_curl -X "$method" "$API$path" -H "Authorization: Bearer $TOKEN" "$@"
 }
 
 # Mints a JWT at the mock issuer for the given scope and echoes the access token.

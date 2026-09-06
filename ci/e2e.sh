@@ -11,6 +11,10 @@
 # Usage: ci/e2e.sh [release] [namespace]
 #   E2E_ONLY=<pattern>  — run only scenario files matching the glob (e.g. E2E_ONLY=30-*)
 #   E2E_SKIP=<pattern>  — skip scenario files matching the glob
+#   E2E_API_URL=<url>   — reach the API here instead of port-forwarding the server Service,
+#                         e.g. http://ister.test:8090/api through the ingress on kind
+#   E2E_CURL_ARGS=<..>  — extra curl args for every API call, e.g.
+#                         "--resolve ister.test:8090:127.0.0.1"
 
 set -euo pipefail
 
@@ -20,7 +24,7 @@ export RELEASE="${1:-ister}"
 export NAMESPACE="${2:-ister}"
 export SERVER_PORT=18080
 export OIDC_PORT=18081
-export API="http://localhost:${SERVER_PORT}/api"
+export API="${E2E_API_URL:-http://localhost:${SERVER_PORT}/api}"
 
 PIDS=()
 cleanup() {
@@ -33,10 +37,10 @@ trap cleanup EXIT
 source "$SCRIPT_DIR/e2e/lib.sh"
 
 echo "==> Port-forwarding"
-forward "${RELEASE}-server" 8080 "$SERVER_PORT"
+[ -n "${E2E_API_URL:-}" ] || forward "${RELEASE}-server" 8080 "$SERVER_PORT"
 forward mock-oidc 8080 "$OIDC_PORT"
-wait_for "http://localhost:${SERVER_PORT}/api/.well-known/ister" \
-  || fail "server not reachable on :${SERVER_PORT}"
+wait_for "$API/.well-known/ister" \
+  || fail "server not reachable at $API"
 wait_for "http://localhost:${OIDC_PORT}/default/.well-known/openid-configuration" \
   || fail "mock issuer not reachable on :${OIDC_PORT}"
 

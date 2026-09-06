@@ -11,6 +11,9 @@
 #   CLUSTER_NAME   — kind cluster name (default: ister)
 #   NAMESPACE      — namespace to install into (default: ister)
 #   RELEASE        — helm release name (default: ister)
+#   EXPOSURE       — nodeport (default) | ingress-nginx | gateway-envoy: also installs that
+#                    controller on the cluster (ci/exposure/*.sh) and adds
+#                    ci/values-<exposure>.yaml. See ci/e2e.sh for how to reach the API then.
 #
 # Image pinning (all optional; by default the chart's own pinned version deploys):
 #   SERVER_IMAGE_REPOSITORY / SERVER_IMAGE_TAG / SERVER_IMAGE_PULL_POLICY
@@ -29,6 +32,7 @@ TESTDATA_DIR="${TESTDATA_DIR:-$(dirname "$CHART_DIR")/testdata}"
 CLUSTER_NAME="${CLUSTER_NAME:-ister}"
 NAMESPACE="${NAMESPACE:-ister}"
 RELEASE="${RELEASE:-ister}"
+EXPOSURE="${EXPOSURE:-nodeport}"
 
 [ -d "$TESTDATA_DIR" ] || { echo "testdata not found at $TESTDATA_DIR (set TESTDATA_DIR)" >&2; exit 1; }
 
@@ -62,6 +66,14 @@ kubectl apply -n "$NAMESPACE" -f "$SCRIPT_DIR/mock-external.yaml"
 kubectl apply -n "$NAMESPACE" -f "$SCRIPT_DIR/nodeports.yaml"
 kubectl wait -n "$NAMESPACE" --for=condition=Available deploy/mock-oidc deploy/podcast-feed deploy/mock-external --timeout=180s
 
+EXTRA_VALUES=()
+if [ "$EXPOSURE" != "nodeport" ]; then
+  [ -x "$SCRIPT_DIR/exposure/$EXPOSURE.sh" ] || { echo "unknown EXPOSURE=$EXPOSURE" >&2; exit 1; }
+  echo "==> Installing the $EXPOSURE controller"
+  NAMESPACE="$NAMESPACE" "$SCRIPT_DIR/exposure/$EXPOSURE.sh"
+  EXTRA_VALUES=(-f "$SCRIPT_DIR/values-$EXPOSURE.yaml")
+fi
+
 HELM_SET_ARGS=()
 [ -n "${SERVER_IMAGE_REPOSITORY:-}" ] && HELM_SET_ARGS+=(--set "server.image.repository=$SERVER_IMAGE_REPOSITORY")
 [ -n "${SERVER_IMAGE_TAG:-}" ] && HELM_SET_ARGS+=(--set "server.image.tag=$SERVER_IMAGE_TAG")
@@ -74,8 +86,8 @@ MIGRATIONS_IMAGE_TAG="${MIGRATIONS_IMAGE_TAG:-${SERVER_IMAGE_TAG:-}}"
 echo "==> Installing the chart${SERVER_IMAGE_TAG:+ (server image tag: $SERVER_IMAGE_TAG)}"
 (
   cd "$CHART_DIR"
-  helm dependency build
   helm upgrade --install "$RELEASE" . -n "$NAMESPACE" -f ci/values-ci.yaml \
+    ${EXTRA_VALUES[@]+"${EXTRA_VALUES[@]}"} \
     ${HELM_SET_ARGS[@]+"${HELM_SET_ARGS[@]}"} --wait --timeout 15m
 )
 

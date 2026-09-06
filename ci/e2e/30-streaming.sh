@@ -17,7 +17,7 @@ export MOVIE_MEDIA_FILE_ID
 echo "    mediaFileId: $MOVIE_MEDIA_FILE_ID"
 
 echo "--> Fetching the master playlist"
-master=$(curl -fsS "$API/hls/$MOVIE_MEDIA_FILE_ID/master.m3u8?token=$stream_token")
+master=$(api_curl "$API/hls/$MOVIE_MEDIA_FILE_ID/master.m3u8?token=$stream_token")
 echo "$master" | head -1 | grep -q '#EXTM3U' || fail "master playlist is not m3u8: $master"
 
 # The master playlist references variant playlists; their URIs already carry ?token=.
@@ -35,11 +35,11 @@ hls_url() { # path-or-uri
 
 echo "--> Waiting for the first transcoded segment (up to ${TRANSCODE_TIMEOUT_SECONDS:-180}s)"
 first_segment_plays() {
-  variant=$(curl -fsS "$(hls_url "$variant_path")") || return 1
+  variant=$(api_curl "$(hls_url "$variant_path")") || return 1
   segment_path=$(echo "$variant" | grep -v '^#' | grep -E '\.(ts|vtt)' | grep '\.ts' | head -1)
   [ -n "$segment_path" ] || { echo "    no segment in variant playlist yet"; return 1; }
   seg_file="${TMPDIR:-/tmp}/ister-e2e-segment.ts"
-  curl -fsS -o "$seg_file" "$(hls_url "$segment_path")" || return 1
+  api_curl -o "$seg_file" "$(hls_url "$segment_path")" || return 1
   size=$(stat -c%s "$seg_file")
   first_byte=$(head -c1 "$seg_file" | od -An -tu1 | tr -d ' ')
   echo "    segment: $segment_path size=$size first_byte=$first_byte"

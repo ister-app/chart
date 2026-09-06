@@ -234,6 +234,16 @@ moves regardless, so CI can go red without anyone touching this repo), on a
 publishing new images, and via `workflow_call` from the release workflow — a chart is never
 released on a red e2e.
 
+The e2e runs as a matrix: the full suite through the chart's NodePort Service on kind's
+default Kubernetes and on an older one (`kindest/node` pin in `ci.yml`), plus the
+streaming scenario through a real ingress-nginx (`ci/exposure/ingress-nginx.sh`, kind's
+published host port) and through Envoy Gateway with the chart's HTTPRoute
+(`ci/exposure/gateway-envoy.sh`). A separate `upgrade` job installs the previous release
+from ghcr and upgrades it to the working tree, then runs `helm test`. The lint job also
+renders `ci/values-render-full.yaml` (helper pods, hardware acceleration, NetworkPolicies,
+the Traefik preset, an external Typesense) and validates the Gateway API resources against
+the CRD catalog.
+
 Three levels of test:
 
 - **`helm test`** — unauthenticated, ships with the chart, so users can run it against
@@ -271,4 +281,7 @@ make up          # fixtures + kind cluster + mock-oidc + podcast-feed + chart in
 make e2e         # the API e2e scenarios
 make player-e2e  # the player's Flutter integration tests (needs ../player + flutter)
 make down        # delete the kind cluster
+
+make up EXPOSURE=ingress-nginx && make e2e-ingress   # the same through ingress-nginx on :8090
+EXPOSURE=gateway-envoy ci/up.sh                       # Envoy Gateway + the chart's HTTPRoute
 ```
