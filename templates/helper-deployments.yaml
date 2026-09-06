@@ -1,0 +1,200 @@
+{{- /*
+Helper nodes: one Deployment + Service per entry of .Values.helpers. A helper owns no
+media (no libraries, no mediaVolumes, no Flyway), only consumes the heavy job families
+for the main server's directories, reading sources over HTTP from it and uploading
+results back. Same image, same database/broker/search, own node name.
+*/}}
+{{- $root := . }}
+{{- $fullname := include "ister.fullname" . }}
+{{- range $helper := .Values.helpers }}
+{{- $name := required "helpers[].name is required" $helper.name }}
+{{- $component := printf "helper-%s" $name }}
+{{- $hwaccel := merge (deepCopy (default dict $helper.hwaccel)) (dict "type" "none" "device" $root.Values.server.hwaccel.device "resources" dict "hostPath" false "privileged" false "supplementalGroups" list) }}
+{{- $cache := merge (deepCopy (default dict $helper.cache)) (dict "sizeLimit" "20Gi" "existingClaim" "") }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $fullname }}-{{ $component }}
+  labels:
+    {{- include "ister.labels" (dict "ctx" $root "component" $component) | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "ister.selectorLabels" (dict "ctx" $root "component" $component) | nindent 6 }}
+  strategy:
+    # One node identity per helper: two pods would fight over the same node row.
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        {{- include "ister.selectorLabels" (dict "ctx" $root "component" $component) | nindent 8 }}
+        {{- with $root.Values.server.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      annotations:
+        checksum/secrets: {{ include (print $root.Template.BasePath "/secrets.yaml") $root | sha256sum }}
+        {{- with $helper.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      serviceAccountName: {{ include "ister.serviceAccountName" $root }}
+      automountServiceAccountToken: false
+      enableServiceLinks: {{ $root.Values.server.enableServiceLinks }}
+      {{- with $root.Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- include "ister.serverPodSecurityContext" (dict "base" $root.Values.server.podSecurityContext "hwaccel" $hwaccel) | nindent 8 }}
+      terminationGracePeriodSeconds: {{ $root.Values.server.terminationGracePeriodSeconds }}
+      {{- with $root.Values.server.priorityClassName }}
+      priorityClassName: {{ . }}
+      {{- end }}
+      {{- with $helper.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $helper.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $helper.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      initContainers:
+        # The main server's Flyway init container owns the schema; a helper only has to
+        # wait for the database (it validates the schema on start and restarts until the
+        # migration has landed).
+        - name: wait-for-db
+          image: {{ include "ister.image" (dict "ctx" $root "image" $root.Values.flyway.waitImage) | quote }}
+          imagePullPolicy: {{ $root.Values.flyway.waitImage.pullPolicy }}
+          securityContext:
+            {{- toYaml $root.Values.server.securityContext | nindent 12 }}
+          command:
+            - sh
+            - -c
+            - |
+              until pg_isready -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER"; do
+                echo "waiting for database at $DB_HOST:$DB_PORT..."
+                sleep 3
+              done
+          env:
+            - name: DB_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "ister.databaseSecretName" $root }}
+                  key: host
+            - name: DB_PORT
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "ister.databaseSecretName" $root }}
+                  key: port
+            - name: DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "ister.databaseSecretName" $root }}
+                  key: user
+          resources:
+            {{- toYaml $root.Values.flyway.resources | nindent 12 }}
+      containers:
+        - name: server
+          image: {{ include "ister.image" (dict "ctx" $root "image" $root.Values.server.image) | quote }}
+          imagePullPolicy: {{ $root.Values.server.image.pullPolicy }}
+          securityContext:
+            {{- include "ister.serverContainerSecurityContext" (dict "base" $root.Values.server.securityContext "hwaccel" $hwaccel) | nindent 12 }}
+          ports:
+            - name: http
+              containerPort: 8080
+            - name: monitor
+              containerPort: {{ $root.Values.server.managementPort }}
+          env:
+            {{- include "ister.serverCommonEnv" $root | nindent 12 }}
+            - name: APP_ISTER_SERVER_NAME
+              value: {{ printf "%s %s" $root.Values.server.name $name | quote }}
+            # Nobody has to reach a helper: it pulls sources from the main server and
+            # pushes results back. Its own Service is what it registers.
+            - name: APP_ISTER_SERVER_URL
+              value: {{ printf "http://%s-%s:8080%s" $fullname $component $root.Values.server.contextPath | quote }}
+            - name: CACHE_DIR
+              value: /cache/
+            - name: TMP_DIR
+              value: /tmp/ister
+            {{- include "ister.helperEnv" (dict "disks" (required (printf "helpers[%s].disks needs at least one entry" $name) $helper.disks) "jobs" $helper.jobs "offloadJobs" list "concurrency" $helper.concurrency) | nindent 12 }}
+            {{- include "ister.hwaccelEnv" $hwaccel | nindent 12 }}
+            {{- with $helper.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          {{- with $root.Values.server.extraEnvFrom }}
+          envFrom:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- if $root.Values.server.probes.enabled }}
+          startupProbe:
+            httpGet:
+              path: {{ $root.Values.server.probes.path }}
+              port: monitor
+            failureThreshold: {{ $root.Values.server.probes.startup.failureThreshold }}
+            periodSeconds: {{ $root.Values.server.probes.startup.periodSeconds }}
+          livenessProbe:
+            httpGet:
+              path: {{ $root.Values.server.probes.path }}
+              port: monitor
+            periodSeconds: {{ $root.Values.server.probes.liveness.periodSeconds }}
+            failureThreshold: {{ $root.Values.server.probes.liveness.failureThreshold }}
+          readinessProbe:
+            httpGet:
+              path: {{ $root.Values.server.probes.path }}
+              port: monitor
+            periodSeconds: {{ $root.Values.server.probes.readiness.periodSeconds }}
+            failureThreshold: {{ $root.Values.server.probes.readiness.failureThreshold }}
+          {{- end }}
+          resources:
+            {{- include "ister.serverResources" (dict "base" (default $root.Values.server.resources $helper.resources) "hwaccel" $hwaccel) | nindent 12 }}
+          volumeMounts:
+            - name: cache
+              mountPath: /cache
+            - name: tmp
+              mountPath: /tmp/ister
+            {{- include "ister.hwaccelVolumeMounts" $hwaccel | nindent 12 }}
+            {{- with $root.Values.server.extraVolumeMounts }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+      volumes:
+        # Scratch only: transcode output is uploaded to the main server, extracted
+        # subtitles too. Nothing here needs to survive the pod.
+        - name: cache
+          {{- if $cache.existingClaim }}
+          persistentVolumeClaim:
+            claimName: {{ $cache.existingClaim }}
+          {{- else }}
+          emptyDir:
+            sizeLimit: {{ $cache.sizeLimit }}
+          {{- end }}
+        - name: tmp
+          emptyDir:
+            sizeLimit: {{ $root.Values.server.tmp.sizeLimit }}
+        {{- include "ister.hwaccelVolumes" $hwaccel | nindent 8 }}
+        {{- with $root.Values.server.extraVolumes }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $fullname }}-{{ $component }}
+  labels:
+    {{- include "ister.labels" (dict "ctx" $root "component" $component) | nindent 4 }}
+spec:
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+    - name: monitor
+      port: {{ $root.Values.server.managementPort }}
+      targetPort: monitor
+  selector:
+    {{- include "ister.selectorLabels" (dict "ctx" $root "component" $component) | nindent 4 }}
+{{- end }}

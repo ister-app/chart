@@ -70,6 +70,15 @@ app out of its own database. This is why `helm template` and `helm install` can 
 work: in `internal`/`cnpg` mode the database is created by the same release, so the hook would wait
 for a database Helm has not created yet.
 
+**Server pods share one env template.** `ister.serverCommonEnv` in `_helpers.tpl` renders
+everything every server pod needs (database, broker, search, OIDC, TMDB, cluster name,
+external service URLs); `server-deployment.yaml` adds the per-node parts (name, URL, cache,
+libraries, directories) and `helper-deployments.yaml` renders one Deployment + Service per
+`helpers[]` entry with the helper-node env (`ister.helperEnv`) instead of libraries. Hardware
+acceleration (`ister.hwaccel*`, `ister.serverPodSecurityContext`, `ister.serverResources`)
+is applied the same way to both. A new server-wide env var belongs in the common template,
+a new per-node one in both callers.
+
 **Images all go through `ister.image`** (`_helpers.tpl`), which takes a `{repository, tag, digest}`
 map and prefers the digest. Every image in the chart — including the Flyway wait container and the
 `helm test` curl image — is declared as such a map in `values.yaml`, never hardcoded in a template.

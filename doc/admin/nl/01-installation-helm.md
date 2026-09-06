@@ -153,6 +153,27 @@ De Services kennen de gebruikelijke knoppen (`server.service`, `website.service`
 `ipFamilyPolicy: SingleStack` / `ipFamilies: [IPv4]` tenzij de player-image 2.8 of nieuwer
 is: oudere images luisteren alleen op IPv4, en een IPv6-only ClusterIP antwoordt dan 503.
 
+## Helper-nodes en hardware-encoding
+
+Een tweede server-pod kan het CPU-zware werk — HLS-transcoderen, intro-/outro-detectie,
+ondertitel-extractie en OCR — voor de directories van de hoofdserver overnemen zonder zelf
+media te bezitten: hij leest de bron via HTTP van de hoofdserver en uploadt het resultaat
+terug. Declareer ze onder `helpers`, één regel per pod, elk met de directories van de
+hoofdserver (`mediaVolumes[].name`) waarmee hij helpt en optioneel welke jobfamilies; de
+hoofdserver kan families volledig uit handen geven met `server.helper.offloadJobs`. Zet
+`server.clusterName` zodat alle pods zich als één cluster aan clients presenteren. De
+helpers delen de database, broker en zoekindex van de chart en hebben verder niets nodig.
+Zie de serverdocumentatie, hoofdstuk Multi-node, voor hoe het werk wordt verdeeld.
+
+Hardware-encoding is `hwaccel` op de hoofdserver en op elke helper: `type: vaapi`
+(Intel/AMD) of `nvdec` (NVIDIA), plus een manier om de pod de GPU te geven. Gebruik bij
+voorkeur een device-plugin (`hwaccel.resources`, bijvoorbeeld `gpu.intel.com/i915: 1`,
+`amd.com/gpu: 1`, `nvidia.com/gpu: 1`, of `squat.ai/dri: 1` met de generic device plugin)
+— zonder privileges en planbaar. `hwaccel.hostPath: true` mount in plaats daarvan het
+devicebestand van de node, wat de device-cgroup alleen toestaat voor een privileged
+container (`hwaccel.privileged`). Zet de group-id's van `video`/`render` van de node in
+`hwaccel.supplementalGroups` als het device group-eigendom is.
+
 ## Beheer
 
 - **Upgrades**: `helm upgrade ister oci://ghcr.io/ister-app/charts/ister --version <v>`

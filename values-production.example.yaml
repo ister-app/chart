@@ -81,6 +81,19 @@ server:
       mountPath: /media-scratch
       hostPath: /srv/media/scratch
 
+  # Hardware encoding on this pod (Intel/AMD VAAPI via the device plugin):
+  # hwaccel:
+  #   type: vaapi
+  #   resources: {gpu.intel.com/i915: 1}
+
+# A GPU box elsewhere in the cluster doing the transcoding, intro detection and subtitle
+# OCR for the NAS node above (see the docs chapter "Helper nodes"):
+# helpers:
+#   - name: gpu
+#     disks: [{name: shows}, {name: music}]
+#     hwaccel: {type: vaapi, resources: {gpu.intel.com/i915: 1}}
+#     nodeSelector: {kubernetes.io/hostname: CHANGEME-gpu-node}
+
 website:
   nodeSelector:
     kubernetes.io/hostname: CHANGEME-node

@@ -137,6 +137,9 @@ helm template ister . -f values-production.yaml | kubectl apply --dry-run=server
 - `/.well-known/ister` is served by the website pod (`website.wellKnown`, default on);
   the ingress-nginx `server-snippet` in `ingress.wellKnown` is the legacy path, and
   modern ingress-nginx drops it silently (`allow-snippet-annotations=false`).
+- `helpers[]` renders extra server pods that own no media and take the heavy job families
+  for the main server's directories (multi-node); `hwaccel` on the server and on helpers
+  wires VAAPI/NVDEC via a device plugin or a privileged hostPath.
 - Exposure is either an Ingress (`ingress.*`, with `ingress.controller` rendering the
   body-size/timeout annotations per controller) or a Gateway API HTTPRoute
   (`gateway.*`). Helper-node uploads and HLS need unbounded bodies and long timeouts;
