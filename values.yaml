@@ -489,43 +489,63 @@ database:
     existingSecret: ""
 
 # ============================================================
-# RabbitMQ — Bitnami subchart (see Chart.yaml dependencies).
-# Values below are passed straight to that chart.
+# RabbitMQ — a single-node StatefulSet on the official image (ister only uses the broker
+# for pass-through work, so nothing here needs clustering).
 # Set enabled: false to use externalRabbitmq instead.
 # ============================================================
 rabbitmq:
   enabled: true
-
-  # Bitnami stopped publishing to docker.io/bitnami, so the subchart's own default image
-  # tag 404s. bitnamilegacy is the mirror of the pre-shutdown images. Overriding the
-  # repository trips the subchart's image check, hence allowInsecureImages.
   image:
-    repository: bitnamilegacy/rabbitmq
-  global:
-    security:
-      allowInsecureImages: true
-
-  # Never expose the management UI. Pinned explicitly (rather than left to the
-  # subchart default) because Helm's value coalescing confuses this key with the
-  # chart's own top-level `ingress` block and warns about it on every render.
-  ingress:
-    enabled: false
-    tls: false
+    repository: rabbitmq
+    tag: "4.2.5-management-alpine"
+    digest: ""
+    pullPolicy: IfNotPresent
   auth:
     username: user
-    # Leave empty and set existingPasswordSecret, or the subchart generates one.
+    # Leave empty to generate one on install (preserved across upgrades). Only applied to
+    # an empty data directory: changing it later means deleting the volume.
     password: ""
-    existingPasswordSecret: ""
-    existingErlangSecret: ""
+    # Pre-existing Secret with keys: rabbitmq-password, rabbitmq-erlang-cookie.
+    existingSecret: ""
   persistence:
     enabled: true
+    existingClaim: ""
+    storageClass: ""
     size: 8Gi
+  # Extra env for rabbitmq itself, e.g. RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS.
+  extraEnv: []
+  podAnnotations: {}
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+  service:
+    annotations: {}
+    # RabbitMQ listens on IPv4 only unless told otherwise: on an IPv6-primary cluster
+    # set ipFamilyPolicy: SingleStack and ipFamilies: [IPv4].
+    ipFamilyPolicy: ""
+    ipFamilies: []
+  # The image's own rabbitmq user (uid 999). OnRootMismatch keeps kubelet from
+  # widening .erlang.cookie to 660 on every start, which RabbitMQ refuses.
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 999
+    runAsGroup: 999
+    fsGroup: 999
+    fsGroupChangePolicy: OnRootMismatch
+    seccompProfile:
+      type: RuntimeDefault
+  securityContext:
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop: [ALL]
+  # No CPU limit: a limit only buys CFS throttling on a broker that idles at a few
+  # millicores. Memory and ephemeral storage stay bounded.
   resources:
     requests:
-      cpu: 100m
+      cpu: 50m
       memory: 256Mi
     limits:
-      memory: 1Gi
+      memory: 512Mi
 
 externalRabbitmq:
   host: ""

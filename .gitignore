@@ -5,8 +5,9 @@ values-production.yaml
 # Local tooling config (contains absolute paths).
 .claude/
 
-# Pulled by `helm dependency build`.
+# Left over from the days of the RabbitMQ subchart.
 charts/
+Chart.lock
 
 # Build artefacts of `helm package` and ci/release-notes.sh. CHANGELOG.md is committed,
 # RELEASE_NOTES.md is only ever handed to `gh release create`.

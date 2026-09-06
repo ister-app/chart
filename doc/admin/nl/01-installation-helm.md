@@ -15,7 +15,7 @@ eigen diensten meebrengt — PostgreSQL, RabbitMQ en Typesense.
 | server | De Spring Boot-backend (`ghcr.io/ister-app/server`) | altijd |
 | website | De webplayer (`ghcr.io/ister-app/player`) | altijd |
 | PostgreSQL | De database | ja (`database.mode: internal`) |
-| RabbitMQ | De message broker (Bitnami-subchart) | ja (`rabbitmq.enabled: true`) |
+| RabbitMQ | De message broker (officiële image, één node) | ja (`rabbitmq.enabled: true`) |
 | Typesense | De zoekmachine | ja (`typesense.enabled: true`) |
 | Flyway | Databasemigraties (`ghcr.io/ister-app/migrations`) | draait als init-container |
 
@@ -68,9 +68,18 @@ van een buiten deze chart beheerd CNPG-cluster voldoet al.
 
 ### RabbitMQ — `rabbitmq.enabled`
 
-`true` installeert de Bitnami RabbitMQ-subchart (alles onder `rabbitmq:` gaat één-op-één
-naar die chart). `false` gebruikt het blok `externalRabbitmq` — diens `existingSecret`
-heeft de sleutel `rabbitmq-password` nodig.
+`true` installeert een RabbitMQ-StatefulSet met één node op de officiële `rabbitmq`-image
+(ister gebruikt de broker alleen voor doorstroomwerk, dus clustering is niet nodig); het
+wachtwoord en de Erlang-cookie worden eenmalig gegenereerd, of komen uit
+`rabbitmq.auth.existingSecret` (sleutels `rabbitmq-password`, `rabbitmq-erlang-cookie`).
+`false` gebruikt het blok `externalRabbitmq` — diens `existingSecret` heeft de sleutel
+`rabbitmq-password` nodig.
+
+Upgraden vanaf een chart van vóór 1.0, die de Bitnami-subchart meeleverde: de oude
+StatefulSet, Service en PVC met de naam `<release>-rabbitmq` worden niet overgenomen.
+Verwijder ze vóór de upgrade (de queues bevatten alleen doorstroomwerk), of draai de
+upgrade en verwijder daarna de achtergebleven PVC; de server verbindt zelf opnieuw met de
+nieuwe broker.
 
 ### Typesense — `typesense.enabled`
 

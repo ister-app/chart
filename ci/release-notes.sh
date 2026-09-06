@@ -53,11 +53,7 @@ mig_tag="$(img flyway.image.tag)"
   echo "| migrations | \`$(img flyway.image.repository)\` | ${mig_tag} |"
   echo "| database | \`$(img database.internal.image.repository)\` | $(img database.internal.image.tag) |"
   echo "| typesense | \`$(img typesense.image.repository)\` | $(img typesense.image.tag) |"
-  echo "| rabbitmq | subchart \`bitnamicharts/rabbitmq\` | $(python3 -c '
-import yaml
-deps = yaml.safe_load(open("Chart.yaml"))["dependencies"]
-print(next(d["version"] for d in deps if d["name"] == "rabbitmq"))
-') |"
+  echo "| rabbitmq | \`$(img rabbitmq.image.repository)\` | $(img rabbitmq.image.tag) |"
   echo
 
   # Group the commits by conventional-commit type. The release commit itself is dropped:

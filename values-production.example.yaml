@@ -18,6 +18,7 @@
 #   kubectl create secret generic ister-search -n ister --from-literal=api-key=...
 #   kubectl create secret generic ister-rabbitmq-auth -n ister \
 #     --from-literal=rabbitmq-password=... --from-literal=rabbitmq-erlang-cookie=...
+#   (or leave rabbitmq.auth.existingSecret empty: the chart generates and keeps both)
 #   kubectl create secret generic ister-backup-s3 -n ister \
 #     --from-literal=AWS_ACCESS_KEY_ID=... --from-literal=AWS_SECRET_ACCESS_KEY=...
 
@@ -146,8 +147,7 @@ rabbitmq:
   enabled: true
   auth:
     username: user
-    existingPasswordSecret: ister-rabbitmq-auth
-    existingErlangSecret: ister-rabbitmq-auth
+    existingSecret: ister-rabbitmq-auth
   persistence:
     enabled: true
     size: 8Gi

@@ -40,7 +40,7 @@ a real cluster.
 | | bundled | external |
 |---|---|---|
 | PostgreSQL | `database.mode=internal` (one pod, no backups)<br>`database.mode=cnpg` (CloudNativePG, HA + Barman backups) | `database.mode=external` |
-| RabbitMQ | `rabbitmq.enabled=true` (Bitnami subchart) | `rabbitmq.enabled=false` + `externalRabbitmq.*` |
+| RabbitMQ | `rabbitmq.enabled=true` (StatefulSet, official image) | `rabbitmq.enabled=false` + `externalRabbitmq.*` |
 | Typesense | `typesense.enabled=true` | `typesense.enabled=false` + `typesense.external.*` |
 
 All three database modes expose the same Secret keys (`host`, `port`, `dbname`, `user`,
@@ -59,7 +59,8 @@ at them:
 |---|---|
 | `server.existingSecret` | `tmdb-api-key` |
 | `typesense.existingSecret` | `api-key` |
-| `externalRabbitmq.existingSecret` / `rabbitmq.auth.existingPasswordSecret` | `rabbitmq-password` |
+| `externalRabbitmq.existingSecret` | `rabbitmq-password` |
+| `rabbitmq.auth.existingSecret` | `rabbitmq-password`, `rabbitmq-erlang-cookie` |
 | `database.external.existingSecret` | `host`, `port`, `dbname`, `user`, `password` |
 | `database.cnpg.backup.existingSecret` | `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` |
 
@@ -113,9 +114,9 @@ kubectl delete servicemonitor ister-service-monitor -n ister
 helm upgrade --install ister . -f values-production.yaml -n ister
 ```
 
-Typesense and RabbitMQ keep their data: point `typesense.persistence.existingClaim` at
-the current `typesense-data` PVC, and either let the RabbitMQ subchart adopt the existing
-`rabbitmq` release or leave the standalone one running and set `rabbitmq.enabled=false`.
+Typesense keeps its data: point `typesense.persistence.existingClaim` at the current
+`typesense-data` PVC. RabbitMQ holds pass-through work only; either let the chart deploy a
+fresh one or leave the standalone one running and set `rabbitmq.enabled=false`.
 
 Verify before committing to it:
 
@@ -199,14 +200,13 @@ repository secret — not the Mend GitHub App. It runs once a day (cron 06:00 UT
 GitHub starts scheduled runs on these repos hours late), and first polls the `release.yml`
 runs of `ister-app/server` and `ister-app/player` until today's have finished, so a night on
 which both released becomes one chart release rather than two. `renovate.json` keeps every
-image tag in `values.yaml`, the RabbitMQ subchart in `Chart.yaml` and the pinned GitHub
-Actions up to date. There are no PRs for patch/minor bumps: Renovate pushes a `renovate/*`
+image tag in `values.yaml` and the pinned GitHub Actions up to date. There are no PRs for patch/minor bumps: Renovate pushes a `renovate/*`
 branch and fast-forwards `main` in the same run, without waiting for checks. The workflow
 then dispatches `release.yml`, which runs the full CI (including the kind e2e) on `main`
 before it publishes — a bump that breaks the e2e fails the release instead of shipping.
 That goes for majors of the ister images too: a new server or player major is still a new
-chart. Majors of third-party images (Postgres, Typesense, the RabbitMQ subchart) wait on the
-dependency dashboard as a PR.
+chart. Majors of third-party images (Postgres, Typesense, RabbitMQ) wait on the dependency
+dashboard as a PR.
 
 Renovate rather than Dependabot because Dependabot's docker manager cannot tell two images in
 one `values.yaml` apart when they carry the same tag string

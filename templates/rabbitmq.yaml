@@ -1,0 +1,178 @@
+{{- if .Values.rabbitmq.enabled }}
+{{- $fullname := include "ister.fullname" . }}
+{{- $rmq := .Values.rabbitmq }}
+{{- $secret := include "ister.rabbitmqSecretName" . }}
+# RabbitMQ as a plain StatefulSet on the official image. It replaced the Bitnami subchart:
+# Bitnami stopped publishing to docker.io/bitnami and the "bitnamilegacy" mirror it had to
+# be pinned to is an unmaintained archive. ister uses the broker for pass-through work
+# only, so there is nothing a chart could add here that this does not cover.
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $fullname }}-rabbitmq
+  labels:
+    {{- include "ister.labels" (dict "ctx" . "component" "rabbitmq") | nindent 4 }}
+  {{- with $rmq.service.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- include "ister.serviceSpec" $rmq.service | nindent 2 }}
+  ports:
+    - name: amqp
+      port: 5672
+      targetPort: amqp
+    # The management API, used by operators to inspect queues and republish
+    # dead-lettered events. Never exposed outside the cluster by this chart.
+    - name: management
+      port: 15672
+      targetPort: management
+  selector:
+    {{- include "ister.selectorLabels" (dict "ctx" . "component" "rabbitmq") | nindent 4 }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $fullname }}-rabbitmq-headless
+  labels:
+    {{- include "ister.labels" (dict "ctx" . "component" "rabbitmq") | nindent 4 }}
+spec:
+  clusterIP: None
+  ports:
+    - name: amqp
+      port: 5672
+      targetPort: amqp
+  selector:
+    {{- include "ister.selectorLabels" (dict "ctx" . "component" "rabbitmq") | nindent 4 }}
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ $fullname }}-rabbitmq
+  labels:
+    {{- include "ister.labels" (dict "ctx" . "component" "rabbitmq") | nindent 4 }}
+spec:
+  serviceName: {{ $fullname }}-rabbitmq-headless
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "ister.selectorLabels" (dict "ctx" . "component" "rabbitmq") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "ister.selectorLabels" (dict "ctx" . "component" "rabbitmq") | nindent 8 }}
+      annotations:
+        checksum/secrets: {{ include (print $.Template.BasePath "/secrets.yaml") . | sha256sum }}
+        {{- with $rmq.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      serviceAccountName: {{ include "ister.serviceAccountName" . }}
+      automountServiceAccountToken: false
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml $rmq.podSecurityContext | nindent 8 }}
+      {{- with $rmq.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $rmq.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $rmq.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      initContainers:
+        # kubelet's fsGroup pass chmods the data dir recursively to group-rw, which puts
+        # .erlang.cookie on 660 — and RabbitMQ refuses to start on anything wider than
+        # 600. fsGroupChangePolicy: OnRootMismatch limits that pass, this repairs the
+        # cookie a previous pass already touched.
+        - name: fix-cookie-perms
+          image: {{ include "ister.image" (dict "ctx" . "image" $rmq.image) | quote }}
+          imagePullPolicy: {{ $rmq.image.pullPolicy }}
+          command: ["sh", "-c", "chmod 600 /var/lib/rabbitmq/.erlang.cookie 2>/dev/null || true"]
+          securityContext:
+            {{- toYaml $rmq.securityContext | nindent 12 }}
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/rabbitmq
+      containers:
+        - name: rabbitmq
+          image: {{ include "ister.image" (dict "ctx" . "image" $rmq.image) | quote }}
+          imagePullPolicy: {{ $rmq.image.pullPolicy }}
+          securityContext:
+            {{- toYaml $rmq.securityContext | nindent 12 }}
+          env:
+            # DEFAULT_USER/PASS only apply to an empty data directory, i.e. the first
+            # start. Changing the password afterwards means deleting the volume.
+            - name: RABBITMQ_DEFAULT_USER
+              value: {{ $rmq.auth.username | quote }}
+            - name: RABBITMQ_DEFAULT_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $secret }}
+                  key: rabbitmq-password
+            - name: RABBITMQ_ERLANG_COOKIE
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $secret }}
+                  key: rabbitmq-erlang-cookie
+            {{- with $rmq.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          ports:
+            - name: amqp
+              containerPort: 5672
+            - name: management
+              containerPort: 15672
+          livenessProbe:
+            exec:
+              command: ["rabbitmq-diagnostics", "-q", "ping"]
+            initialDelaySeconds: 60
+            periodSeconds: 30
+            timeoutSeconds: 15
+            failureThreshold: 5
+          readinessProbe:
+            exec:
+              command: ["rabbitmq-diagnostics", "-q", "check_running"]
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            timeoutSeconds: 10
+            failureThreshold: 6
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/rabbitmq
+          resources:
+            {{- toYaml $rmq.resources | nindent 12 }}
+      {{- if not $rmq.persistence.enabled }}
+      volumes:
+        - name: data
+          emptyDir: {}
+      {{- else if $rmq.persistence.existingClaim }}
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: {{ $rmq.persistence.existingClaim }}
+      {{- end }}
+  {{- if and $rmq.persistence.enabled (not $rmq.persistence.existingClaim) }}
+  # A volumeClaimTemplate PVC outlives the StatefulSet: `helm uninstall` leaves it
+  # behind, delete it by hand if you want a clean slate (its content is pass-through
+  # work only, nothing to keep).
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        {{- with $rmq.persistence.storageClass }}
+        storageClassName: {{ . }}
+        {{- end }}
+        resources:
+          requests:
+            storage: {{ $rmq.persistence.size }}
+  {{- end }}
+{{- end }}

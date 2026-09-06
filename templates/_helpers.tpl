@@ -103,24 +103,13 @@ mode's hand-written Secret mirrors them.
 
 {{/*
 ================= RabbitMQ =================
-When the Bitnami subchart is enabled we must reproduce its resource names, because
-its Service and Secret are named by *its* fullname template, not ours.
+Bundled: the chart's own StatefulSet + Secret. External: externalRabbitmq.* and either
+its existingSecret or the Secret the chart renders from externalRabbitmq.password.
 */}}
-
-{{- define "ister.rabbitmqSubchartFullname" -}}
-{{- $rmq := .Values.rabbitmq -}}
-{{- if $rmq.fullnameOverride -}}
-{{- $rmq.fullnameOverride | trunc 63 | trimSuffix "-" -}}
-{{- else if contains "rabbitmq" .Release.Name -}}
-{{- .Release.Name | trunc 63 | trimSuffix "-" -}}
-{{- else -}}
-{{- printf "%s-rabbitmq" .Release.Name | trunc 63 | trimSuffix "-" -}}
-{{- end -}}
-{{- end }}
 
 {{- define "ister.rabbitmqHost" -}}
 {{- if .Values.rabbitmq.enabled -}}
-{{- include "ister.rabbitmqSubchartFullname" . -}}
+{{- printf "%s-rabbitmq" (include "ister.fullname" .) -}}
 {{- else -}}
 {{- required "externalRabbitmq.host is required when rabbitmq.enabled is false" .Values.externalRabbitmq.host -}}
 {{- end -}}
@@ -140,13 +129,13 @@ its Service and Secret are named by *its* fullname template, not ours.
 
 {{- define "ister.rabbitmqSecretName" -}}
 {{- if .Values.rabbitmq.enabled -}}
-{{- default (include "ister.rabbitmqSubchartFullname" .) .Values.rabbitmq.auth.existingPasswordSecret -}}
+{{- default (printf "%s-rabbitmq" (include "ister.fullname" .)) .Values.rabbitmq.auth.existingSecret -}}
 {{- else -}}
 {{- default (printf "%s-rabbitmq" (include "ister.fullname" .)) .Values.externalRabbitmq.existingSecret -}}
 {{- end -}}
 {{- end }}
 
-{{/* Both the Bitnami chart and our external Secret use this key. */}}
+{{/* Both the bundled and the external Secret use this key. */}}
 {{- define "ister.rabbitmqSecretKey" -}}rabbitmq-password{{- end }}
 
 {{/*
