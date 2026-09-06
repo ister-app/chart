@@ -10,33 +10,20 @@ server:
 
   # Every external metadata source is served by ci/mock-external.yaml, so enrichment is
   # deterministic and needs no internet. Each service lives under its own path prefix.
-  extraEnv:
-    - name: SPRING_CLOUD_OPENFEIGN_CLIENT_CONFIG_TMDB_URL
-      value: http://mock-external:8080/tmdb
-    - name: APP_ISTER_WORKER_TMDB_IMAGE_BASE
-      value: http://mock-external:8080/img/tmdb
-    - name: APP_ISTER_WORKER_MUSICBRAINZ_BASE
-      value: http://mock-external:8080/musicbrainz
-    - name: APP_ISTER_WORKER_MUSICBRAINZ_COVERART_RELEASE_BASE
-      value: http://mock-external:8080/img/coverart/release
-    - name: APP_ISTER_WORKER_MUSICBRAINZ_COVERART_RELEASE_GROUP_BASE
-      value: http://mock-external:8080/img/coverart/release-group
-    - name: APP_ISTER_WORKER_MUSICBRAINZ_COMMONS_FILEPATH_BASE
-      value: http://mock-external:8080/img/commons/
-    - name: APP_ISTER_WORKER_OPENLIBRARY_BASE
-      value: http://mock-external:8080/openlibrary
-    - name: APP_ISTER_WORKER_OPENLIBRARY_COVERS_BASE
-      value: http://mock-external:8080/img/olcovers/
-    - name: APP_ISTER_WORKER_OPENLIBRARY_AUTHOR_PHOTO_BASE
-      value: http://mock-external:8080/img/olauthor/
-    - name: APP_ISTER_WORKER_WIKIDATA_ENTITY_BASE
-      value: http://mock-external:8080/wikidata/entity/
-    - name: APP_ISTER_WORKER_WIKIDATA_API_BASE
-      value: http://mock-external:8080/wikidata/api
-    - name: APP_ISTER_WORKER_WIKIPEDIA_SUMMARY_TEMPLATE
-      value: http://mock-external:8080/wikipedia/{lang}/summary/{title}
-    - name: APP_ISTER_API_PODCAST_ITUNES_BASE
-      value: http://mock-external:8080/itunes
+  externalServices:
+    tmdbApiUrl: http://mock-external:8080/tmdb
+    tmdbImageBase: http://mock-external:8080/img/tmdb
+    musicbrainzBase: http://mock-external:8080/musicbrainz
+    coverArtReleaseBase: http://mock-external:8080/img/coverart/release
+    coverArtReleaseGroupBase: http://mock-external:8080/img/coverart/release-group
+    commonsFilepathBase: http://mock-external:8080/img/commons/
+    openLibraryBase: http://mock-external:8080/openlibrary
+    openLibraryCoversBase: http://mock-external:8080/img/olcovers/
+    openLibraryAuthorPhotoBase: http://mock-external:8080/img/olauthor/
+    wikidataEntityBase: http://mock-external:8080/wikidata/entity/
+    wikidataApiBase: http://mock-external:8080/wikidata/api
+    wikipediaSummaryTemplate: http://mock-external:8080/wikipedia/{lang}/summary/{title}
+    itunesBase: http://mock-external:8080/itunes
 
   # server.url is deliberately NOT set: the default (http://localhost:8080/api) is what
   # /.well-known/ister advertises, and that is exactly where the player integration

@@ -5,7 +5,12 @@
   "additionalProperties": false,
   "properties": {
     "global": {
-      "type": "object"
+      "type": "object",
+      "properties": {
+        "imageRegistry": {
+          "type": "string"
+        }
+      }
     },
     "nameOverride": {
       "type": "string"
@@ -314,6 +319,185 @@
                 ]
               }
             }
+          }
+        },
+        "clusterName": {
+          "type": "string"
+        },
+        "languages": {
+          "type": "string"
+        },
+        "websocketAllowedOrigins": {
+          "type": "string"
+        },
+        "externalServices": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "tmdbApiUrl": {
+              "type": "string"
+            },
+            "tmdbImageBase": {
+              "type": "string"
+            },
+            "musicbrainzBase": {
+              "type": "string"
+            },
+            "coverArtReleaseBase": {
+              "type": "string"
+            },
+            "coverArtReleaseGroupBase": {
+              "type": "string"
+            },
+            "commonsFilepathBase": {
+              "type": "string"
+            },
+            "openLibraryBase": {
+              "type": "string"
+            },
+            "openLibraryCoversBase": {
+              "type": "string"
+            },
+            "openLibraryAuthorPhotoBase": {
+              "type": "string"
+            },
+            "wikidataEntityBase": {
+              "type": "string"
+            },
+            "wikidataApiBase": {
+              "type": "string"
+            },
+            "wikipediaSummaryTemplate": {
+              "type": "string"
+            },
+            "itunesBase": {
+              "type": "string"
+            }
+          }
+        },
+        "hwaccel": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "type": "string",
+              "enum": [
+                "none",
+                "vaapi",
+                "nvdec"
+              ]
+            },
+            "device": {
+              "type": "string"
+            },
+            "resources": {
+              "type": "object"
+            },
+            "hostPath": {
+              "type": "boolean"
+            },
+            "privileged": {
+              "type": "boolean"
+            },
+            "supplementalGroups": {
+              "type": "array",
+              "items": {
+                "type": "integer"
+              }
+            }
+          }
+        },
+        "helper": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "disks": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "name"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "jobs": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "TRANSCODE",
+                        "DETECT_SEGMENTS",
+                        "SUBTITLES"
+                      ]
+                    }
+                  }
+                }
+              }
+            },
+            "jobs": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "TRANSCODE",
+                  "DETECT_SEGMENTS",
+                  "SUBTITLES"
+                ]
+              }
+            },
+            "offloadJobs": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "TRANSCODE",
+                  "DETECT_SEGMENTS",
+                  "SUBTITLES"
+                ]
+              }
+            },
+            "concurrency": {
+              "type": [
+                "string",
+                "integer"
+              ]
+            }
+          }
+        },
+        "extraEnvFrom": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "extraVolumes": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "extraVolumeMounts": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "podLabels": {
+          "type": "object"
+        },
+        "terminationGracePeriodSeconds": {
+          "type": "integer"
+        },
+        "priorityClassName": {
+          "type": "string"
+        },
+        "topologySpreadConstraints": {
+          "type": "array",
+          "items": {
+            "type": "object"
           }
         }
       },
@@ -990,6 +1174,137 @@
             "backendRequest": {
               "type": "string"
             }
+          }
+        }
+      }
+    },
+    "commonLabels": {
+      "type": "object"
+    },
+    "helpers": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "disks"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
+          },
+          "disks": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "name"
+              ],
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "jobs": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "enum": [
+                      "TRANSCODE",
+                      "DETECT_SEGMENTS",
+                      "SUBTITLES"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "jobs": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "TRANSCODE",
+                "DETECT_SEGMENTS",
+                "SUBTITLES"
+              ]
+            }
+          },
+          "concurrency": {
+            "type": [
+              "string",
+              "integer"
+            ]
+          },
+          "hwaccel": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "none",
+                  "vaapi",
+                  "nvdec"
+                ]
+              },
+              "device": {
+                "type": "string"
+              },
+              "resources": {
+                "type": "object"
+              },
+              "hostPath": {
+                "type": "boolean"
+              },
+              "privileged": {
+                "type": "boolean"
+              },
+              "supplementalGroups": {
+                "type": "array",
+                "items": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "resources": {
+            "type": "object"
+          },
+          "nodeSelector": {
+            "type": "object"
+          },
+          "tolerations": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "affinity": {
+            "type": "object"
+          },
+          "cache": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "sizeLimit": {
+                "type": "string"
+              },
+              "existingClaim": {
+                "type": "string"
+              }
+            }
+          },
+          "extraEnv": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "podAnnotations": {
+            "type": "object"
           }
         }
       }

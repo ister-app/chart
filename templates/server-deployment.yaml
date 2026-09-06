@@ -19,6 +19,9 @@ spec:
     metadata:
       labels:
         {{- include "ister.selectorLabels" (dict "ctx" . "component" "server") | nindent 8 }}
+        {{- with .Values.server.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
       annotations:
         # Roll the pods when any referenced credential changes.
         checksum/secrets: {{ include (print $.Template.BasePath "/secrets.yaml") . | sha256sum }}
@@ -36,7 +39,15 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       securityContext:
-        {{- toYaml .Values.server.podSecurityContext | nindent 8 }}
+        {{- include "ister.serverPodSecurityContext" (dict "base" .Values.server.podSecurityContext "hwaccel" .Values.server.hwaccel) | nindent 8 }}
+      terminationGracePeriodSeconds: {{ .Values.server.terminationGracePeriodSeconds }}
+      {{- with .Values.server.priorityClassName }}
+      priorityClassName: {{ . }}
+      {{- end }}
+      {{- with .Values.server.topologySpreadConstraints }}
+      topologySpreadConstraints:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       {{- with .Values.server.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
@@ -137,54 +148,18 @@ spec:
           image: {{ include "ister.image" (dict "ctx" . "image" .Values.server.image) | quote }}
           imagePullPolicy: {{ .Values.server.image.pullPolicy }}
           securityContext:
-            {{- toYaml .Values.server.securityContext | nindent 12 }}
+            {{- include "ister.serverContainerSecurityContext" (dict "base" .Values.server.securityContext "hwaccel" .Values.server.hwaccel) | nindent 12 }}
           ports:
             - name: http
               containerPort: 8080
             - name: monitor
               containerPort: {{ .Values.server.managementPort }}
           env:
-            # --- Database. Note DB_PATH, not DB_PORT: that is what core.properties
-            # --- interpolates into the JDBC URL. Flyway reads DB_PORT instead.
-            - name: DB_HOST
-              valueFrom:
-                secretKeyRef:
-                  name: {{ include "ister.databaseSecretName" . }}
-                  key: host
-            - name: DB_PATH
-              valueFrom:
-                secretKeyRef:
-                  name: {{ include "ister.databaseSecretName" . }}
-                  key: port
-            - name: DB_NAME
-              valueFrom:
-                secretKeyRef:
-                  name: {{ include "ister.databaseSecretName" . }}
-                  key: dbname
-            - name: DB_USER
-              valueFrom:
-                secretKeyRef:
-                  name: {{ include "ister.databaseSecretName" . }}
-                  key: user
-            - name: DB_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: {{ include "ister.databaseSecretName" . }}
-                  key: password
-            # --- Application
-            - name: SERVER_SERVLET_CONTEXT_PATH
-              value: {{ .Values.server.contextPath | quote }}
+            {{- include "ister.serverCommonEnv" . | nindent 12 }}
             - name: APP_ISTER_SERVER_NAME
               value: {{ .Values.server.name | quote }}
             - name: APP_ISTER_SERVER_URL
               value: {{ include "ister.serverUrl" . | quote }}
-            - name: OIDC_URL
-              value: {{ required "server.oidc.url is required" .Values.server.oidc.url | quote }}
-            - name: APP_ISTER_SERVER_TMDB_APIKEY
-              valueFrom:
-                secretKeyRef:
-                  name: {{ include "ister.serverSecretName" . }}
-                  key: tmdb-api-key
             # The server joins cache paths by plain concatenation (its own default is
             # "/cache/"), so this env value needs the trailing slash the mountPath must
             # not have — without it image downloads try to write to e.g. /cacheXXX.jpg.
@@ -211,42 +186,16 @@ spec:
             {{- $dirIndex = add1 $dirIndex }}
             {{- end }}
             {{- end }}
-            # --- RabbitMQ
-            - name: SPRING_RABBITMQ_HOST
-              value: {{ include "ister.rabbitmqHost" . | quote }}
-            - name: SPRING_RABBITMQ_PORT
-              value: {{ include "ister.rabbitmqPort" . | quote }}
-            - name: SPRING_RABBITMQ_USERNAME
-              value: {{ include "ister.rabbitmqUser" . | quote }}
-            - name: SPRING_RABBITMQ_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: {{ include "ister.rabbitmqSecretName" . }}
-                  key: {{ include "ister.rabbitmqSecretKey" . }}
-            # --- Typesense
-            {{- if or .Values.typesense.enabled .Values.typesense.external.host }}
-            - name: TYPESENSE_ENABLED
-              value: "true"
-            - name: TYPESENSE_HOST
-              value: {{ include "ister.typesenseHost" . | quote }}
-            - name: TYPESENSE_PORT
-              value: {{ ternary .Values.typesense.port .Values.typesense.external.port .Values.typesense.enabled | quote }}
-            - name: TYPESENSE_PROTOCOL
-              value: {{ ternary "http" .Values.typesense.external.protocol .Values.typesense.enabled | quote }}
-            - name: TYPESENSE_COLLECTION
-              value: {{ .Values.typesense.collection | quote }}
-            - name: TYPESENSE_API_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: {{ include "ister.typesenseSecretName" . }}
-                  key: api-key
-            {{- else }}
-            - name: TYPESENSE_ENABLED
-              value: "false"
-            {{- end }}
+            # --- Helper-node settings and hardware acceleration
+            {{- include "ister.helperEnv" .Values.server.helper | nindent 12 }}
+            {{- include "ister.hwaccelEnv" .Values.server.hwaccel | nindent 12 }}
             {{- with .Values.server.extraEnv }}
             {{- toYaml . | nindent 12 }}
             {{- end }}
+          {{- with .Values.server.extraEnvFrom }}
+          envFrom:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
           {{- if .Values.server.probes.enabled }}
           startupProbe:
             httpGet:
@@ -268,7 +217,7 @@ spec:
             failureThreshold: {{ .Values.server.probes.readiness.failureThreshold }}
           {{- end }}
           resources:
-            {{- toYaml .Values.server.resources | nindent 12 }}
+            {{- include "ister.serverResources" (dict "base" .Values.server.resources "hwaccel" .Values.server.hwaccel) | nindent 12 }}
           volumeMounts:
             {{- if .Values.cache.enabled }}
             - name: cache
@@ -284,6 +233,10 @@ spec:
               {{- if .readOnly }}
               readOnly: true
               {{- end }}
+            {{- end }}
+            {{- include "ister.hwaccelVolumeMounts" .Values.server.hwaccel | nindent 12 }}
+            {{- with .Values.server.extraVolumeMounts }}
+            {{- toYaml . | nindent 12 }}
             {{- end }}
       volumes:
         {{- if .Values.cache.enabled }}
@@ -304,4 +257,8 @@ spec:
         {{- range .Values.server.mediaVolumes }}
         - name: media-{{ .name }}
           {{- include "ister.mediaVolumeSource" . | nindent 10 }}
+        {{- end }}
+        {{- include "ister.hwaccelVolumes" .Values.server.hwaccel | nindent 8 }}
+        {{- with .Values.server.extraVolumes }}
+        {{- toYaml . | nindent 8 }}
         {{- end }}

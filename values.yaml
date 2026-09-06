@@ -10,6 +10,14 @@
 nameOverride: ""
 fullnameOverride: ""
 
+global:
+  # Prefix for every image repository, for a registry mirror or an air-gapped cluster,
+  # e.g. "harbor.example.com/proxy/". Applied to all images the chart deploys.
+  imageRegistry: ""
+
+# Labels added to every resource the chart creates.
+commonLabels: {}
+
 # Applied to every pod. The website image (Forgejo) may need one.
 imagePullSecrets: []
 
@@ -22,8 +30,12 @@ serviceAccount:
 # Server (Spring Boot backend)
 # ============================================================
 server:
-  # Display name of this instance. Also the first line of /.well-known/ister.
+  # Display name of this instance. Also the first line of /.well-known/ister, and the
+  # node name in a multi-node setup.
   name: Ister
+  # Name of the whole ister cluster as shown to clients; empty = server.name. Set it when
+  # you add helper nodes (below) so the pods share one cluster identity.
+  clusterName: ""
 
   image:
     repository: ghcr.io/ister-app/server
@@ -63,8 +75,72 @@ server:
   # Keep this false or the server will fail to start once Typesense exists.
   enableServiceLinks: false
 
-  # Extra env vars, e.g. ISTER_LANGUAGES, CACHE_CLEANUP_CRON.
+  # App-wide language tags (ISO-639-1, comma separated); empty = the server default (en,nl).
+  languages: ""
+  # Extra origins allowed on the GraphQL websocket handshake, comma separated ("*" = any),
+  # on top of the public host derived from the server URL.
+  websocketAllowedOrigins: ""
+
+  # Base URLs of the external metadata sources, for a proxy, a mirror or an air-gapped
+  # cluster. Empty = the real service. (ci/values-ci.yaml points them all at WireMock.)
+  externalServices:
+    tmdbApiUrl: ""
+    tmdbImageBase: ""
+    musicbrainzBase: ""
+    coverArtReleaseBase: ""
+    coverArtReleaseGroupBase: ""
+    commonsFilepathBase: ""
+    openLibraryBase: ""
+    openLibraryCoversBase: ""
+    openLibraryAuthorPhotoBase: ""
+    wikidataEntityBase: ""
+    wikidataApiBase: ""
+    wikipediaSummaryTemplate: ""
+    itunesBase: ""
+
+  # Hardware video encoding for the HLS transcoder. type: none | vaapi | nvdec.
+  # The pod needs the GPU too; either via a device plugin resource (recommended, no
+  # privileges: intel-device-plugins, the AMD GPU device plugin, the NVIDIA device
+  # plugin, or squat's generic-device-plugin for /dev/dri) or via hostPath on the device
+  # file, which the device cgroup only allows for a privileged container.
+  hwaccel:
+    type: none
+    device: /dev/dri/renderD128
+    # Device plugin resources added to the container limits,
+    # e.g. {gpu.intel.com/i915: 1}, {amd.com/gpu: 1}, {nvidia.com/gpu: 1}, {squat.ai/dri: 1}.
+    resources: {}
+    # Mount hwaccel.device from the node as a hostPath instead. Requires privileged.
+    hostPath: false
+    privileged: false
+    # Groups that may open the device on the node, e.g. [44, 105] (video, render).
+    supplementalGroups: []
+
+  # This node helping other nodes (a multi-node cluster, see the server docs, chapter
+  # Multi-node): the directory names of another node it consumes work for.
+  helper:
+    disks: []
+    # - name: nas-shows
+    #   jobs: [TRANSCODE, DETECT_SEGMENTS, SUBTITLES]   # empty = helper.jobs
+    # Default job set for disks without their own; empty = all three.
+    jobs: []
+    # Job families this node does NOT run for its own directories, leaving them to
+    # helpers (below or elsewhere): TRANSCODE, DETECT_SEGMENTS, SUBTITLES.
+    offloadJobs: []
+    # Listener concurrency of the heavy handlers; empty = the server default.
+    concurrency: ""
+
+  # Extra env vars, e.g. CACHE_CLEANUP_CRON, HLS_MAX_CONCURRENT_FILES.
   extraEnv: []
+  # Extra envFrom sources (ConfigMaps/Secrets with more settings).
+  extraEnvFrom: []
+  # Extra volumes and mounts for the server container.
+  extraVolumes: []
+  extraVolumeMounts: []
+  podLabels: {}
+  # A transcode killed mid-pass leaves a viewer without a stream; give it time to finish.
+  terminationGracePeriodSeconds: 120
+  priorityClassName: ""
+  topologySpreadConstraints: []
 
   service:
     type: ClusterIP
@@ -152,6 +228,35 @@ server:
   #   library: music
   #   mountPath: /mnt/music
   #   existingClaim: media-music
+
+# ============================================================
+# Helper nodes: extra server pods that own no media but take the heavy job families
+# (TRANSCODE, DETECT_SEGMENTS, SUBTITLES) for the main server's directories — for
+# example one pod on the GPU node while the media sits on the NAS node. Each helper reads
+# the source over HTTP from the main server and uploads results back to it, so it needs
+# nothing but the same database, broker and search. It registers as node
+# "<server.name> <helper.name>" in cluster server.clusterName.
+# ============================================================
+helpers: []
+# - name: gpu
+#   disks:
+#     - name: shows           # a mediaVolumes[].name (= directory name) of the main server
+#       jobs: [TRANSCODE]     # empty = jobs
+#   jobs: []                  # default job set for the disks; empty = all three
+#   concurrency: ""
+#   hwaccel:                  # same shape as server.hwaccel
+#     type: vaapi
+#     resources: {gpu.intel.com/i915: 1}
+#   resources: {}
+#   nodeSelector: {}
+#   tolerations: []
+#   affinity: {}
+#   # Scratch for transcodes and extractions: an emptyDir of this size, or an existing PVC.
+#   cache:
+#     sizeLimit: 20Gi
+#     existingClaim: ""
+#   extraEnv: []
+#   podAnnotations: {}
 
 # ============================================================
 # Website (frontend)
