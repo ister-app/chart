@@ -1,0 +1,14 @@
+{{- if .Values.website.wellKnown.enabled }}
+# The client discovery document, mounted into the website pod's html root as
+# /.well-known/ister so it is served at the site root by whatever fronts the website —
+# ingress, Gateway, NodePort or a port-forward — without controller-specific snippets.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "ister.fullname" . }}-wellknown
+  labels:
+    {{- include "ister.labels" (dict "ctx" . "component" "website") | nindent 4 }}
+data:
+  ister: |
+    {{- include "ister.wellKnownDocument" . | nindent 4 }}
+{{- end }}

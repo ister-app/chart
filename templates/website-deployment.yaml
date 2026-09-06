@@ -16,10 +16,14 @@ spec:
     metadata:
       labels:
         {{- include "ister.selectorLabels" (dict "ctx" . "component" "website") | nindent 8 }}
-      {{- with .Values.website.podAnnotations }}
       annotations:
+        {{- if .Values.website.wellKnown.enabled }}
+        # Roll the pod when the discovery document changes (server.name, OIDC, URL).
+        checksum/wellknown: {{ include "ister.wellKnownDocument" . | sha256sum }}
+        {{- end }}
+        {{- with .Values.website.podAnnotations }}
         {{- toYaml . | nindent 8 }}
-      {{- end }}
+        {{- end }}
     spec:
       serviceAccountName: {{ include "ister.serviceAccountName" . }}
       automountServiceAccountToken: false
@@ -50,6 +54,17 @@ spec:
           ports:
             - name: http
               containerPort: {{ .Values.website.port }}
+          {{- with .Values.website.extraEnv }}
+          env:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- if .Values.website.wellKnown.enabled }}
+          volumeMounts:
+            - name: wellknown
+              mountPath: /usr/share/nginx/html/.well-known/ister
+              subPath: ister
+              readOnly: true
+          {{- end }}
           {{- if .Values.website.probes.enabled }}
           readinessProbe:
             httpGet:
@@ -64,3 +79,9 @@ spec:
           {{- end }}
           resources:
             {{- toYaml .Values.website.resources | nindent 12 }}
+      {{- if .Values.website.wellKnown.enabled }}
+      volumes:
+        - name: wellknown
+          configMap:
+            name: {{ include "ister.fullname" . }}-wellknown
+      {{- end }}

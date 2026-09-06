@@ -181,9 +181,71 @@ host so it cannot drift from the Ingress and the /.well-known/ister document.
 {{- else if .Values.ingress.enabled -}}
 {{- $scheme := ternary "https" "http" .Values.ingress.tls.enabled -}}
 {{- printf "%s://%s%s" $scheme (required "ingress.host is required when ingress.enabled is true" .Values.ingress.host) .Values.server.contextPath -}}
+{{- else if .Values.gateway.enabled -}}
+{{- $scheme := ternary "https" "http" .Values.gateway.tls -}}
+{{- printf "%s://%s%s" $scheme (required "gateway.hostnames needs at least one entry when gateway.enabled is true" (first .Values.gateway.hostnames)) .Values.server.contextPath -}}
 {{- else -}}
 {{- printf "http://localhost:8080%s" .Values.server.contextPath -}}
 {{- end -}}
+{{- end }}
+
+{{/*
+The /.well-known/ister discovery document: instance name, OIDC discovery URL, API base.
+Built from the same values as OIDC_URL and APP_ISTER_SERVER_URL, so the three cannot drift.
+*/}}
+{{- define "ister.wellKnownDocument" -}}
+{{ .Values.server.name }}
+{{ required "server.oidc.url is required" .Values.server.oidc.url }}/.well-known/openid-configuration
+{{ include "ister.serverUrl" . }}
+{{- end }}
+
+{{/*
+Ingress annotations for the controller preset in ingress.controller. Values from
+ingress.annotations are merged on top and win.
+*/}}
+{{- define "ister.ingressPresetAnnotations" -}}
+{{- $p := .Values.ingress.proxy -}}
+{{- $timeout := $p.timeoutSeconds | toString -}}
+{{- if eq .Values.ingress.controller "nginx" -}}
+nginx.ingress.kubernetes.io/proxy-body-size: {{ ternary "0" (printf "%sm" ($p.bodySize | toString)) (eq ($p.bodySize | toString) "0") | quote }}
+nginx.ingress.kubernetes.io/proxy-read-timeout: {{ $timeout | quote }}
+nginx.ingress.kubernetes.io/proxy-send-timeout: {{ $timeout | quote }}
+nginx.ingress.kubernetes.io/proxy-request-buffering: "off"
+{{- else if eq .Values.ingress.controller "haproxy" -}}
+haproxy.org/timeout-server: {{ printf "%ss" $timeout | quote }}
+haproxy.org/timeout-tunnel: {{ printf "%ss" $timeout | quote }}
+{{- else if eq .Values.ingress.controller "traefik" -}}
+{{- /* No per-Ingress knobs: Traefik has no body limit by default and its read timeouts
+       are entrypoint settings. Nothing to render. */ -}}
+{{- else if .Values.ingress.controller -}}
+{{- fail (printf "ingress.controller %q is not one of: nginx, traefik, haproxy" .Values.ingress.controller) -}}
+{{- end -}}
+{{- end }}
+
+{{/*
+Common Service spec fields from a {type, port, nodePort, loadBalancerIP, ...} map.
+Usage: {{ include "ister.serviceSpec" .Values.server.service | nindent 2 }}
+*/}}
+{{- define "ister.serviceSpec" -}}
+{{- with .type }}
+type: {{ . }}
+{{- end }}
+{{- with .loadBalancerIP }}
+loadBalancerIP: {{ . }}
+{{- end }}
+{{- with .loadBalancerClass }}
+loadBalancerClass: {{ . }}
+{{- end }}
+{{- with .externalTrafficPolicy }}
+externalTrafficPolicy: {{ . }}
+{{- end }}
+{{- with .ipFamilyPolicy }}
+ipFamilyPolicy: {{ . }}
+{{- end }}
+{{- with .ipFamilies }}
+ipFamilies:
+  {{- toYaml . | nindent 2 }}
+{{- end }}
 {{- end }}
 
 {{/*

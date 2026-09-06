@@ -118,14 +118,40 @@ Twee andere opslagknoppen doen ertoe:
 - `server.tmp` — kladruimte voor transcoderen. Zet dit uit wanneer `mountPath` binnen een
   van je mediavolumes valt, anders overschaduwt het aparte volume dat pad.
 
-## Ingress
+## Naar buiten: Ingress of Gateway API
 
-`ingress.enabled: true` publiceert de player op `/` en de API op `server.contextPath`
-(standaard `/api`) op `ingress.host`, met TLS via cert-manager wanneer
-`ingress.tls.certIssuer` is gezet. `ingress.wellKnown.enabled` serveert daarnaast
-`/.well-known/ister` voor client-discovery — geïmplementeerd als een
-ingress-nginx-server-snippet, dat moderne ingress-nginx standaard uitschakelt
-(`allow-snippet-annotations`); zet dat eerst aan op de controller.
+Beide publiceren de player op `/` en de API op `server.contextPath` (standaard `/api`)
+op één hostnaam; kies er één.
+
+- **Ingress** — `ingress.enabled: true` met `ingress.host`. `ingress.className` is
+  standaard leeg (de default IngressClass van het cluster); zet hem als je meerdere
+  controllers draait. TLS via cert-manager wanneer `ingress.tls.certIssuer` is gezet.
+- **Gateway API** — `gateway.enabled: true` met `gateway.hostnames` en
+  `gateway.parentRefs` (de Gateway en listener om aan te hangen; de Gateway zelf is van
+  jou en moet routes uit de namespace van de chart toelaten). Werkt met Envoy Gateway,
+  Cilium, Istio, de Gateway-provider van Traefik en dergelijke.
+
+Wat er ook vóór ister staat, het moet drie dingen toelaten die de meeste proxies
+standaard begrenzen: onbegrensde request-bodies (helper-nodes uploaden hele HLS-segmenten
+en ondertitelbestanden), responses die minuten tot uren lopen (HLS-afspelen, een
+helper-node die een bron van meerdere GB leest) en websocket-upgrades op
+`/api/graphql`. `ingress.controller` (`nginx` | `traefik` | `haproxy`) rendert de
+bijbehorende annotaties uit `ingress.proxy`; de HTTPRoute zet `timeouts.request: 0s` op de
+`/api`-regel (`gateway.apiTimeouts`). Traefik heeft per Ingress niets nodig, maar zijn
+leestimeouts zijn entrypoint-instellingen
+(`entryPoints.<naam>.transport.respondingTimeouts`).
+
+`/.well-known/ister`, het document dat clients als eerste ophalen (naam van de
+instantie, OIDC-issuer, API-URL), wordt door de website-pod zelf geserveerd
+(`website.wellKnown`, standaard aan), dus het werkt achter elke controller, een NodePort
+of een port-forward. De oudere ingress-nginx-snippet (`ingress.wellKnown`) bestaat nog
+voor opstellingen die erop leunen.
+
+De Services kennen de gebruikelijke knoppen (`server.service`, `website.service`,
+`typesense.service`: `type`, `nodePort`, `annotations`, `loadBalancerIP`, `ipFamilies`,
+...). Geef op een IPv6-first cluster de website- en Typesense-Services
+`ipFamilyPolicy: SingleStack` / `ipFamilies: [IPv4]` tenzij de player-image 2.8 of nieuwer
+is: oudere images luisteren alleen op IPv4, en een IPv6-only ClusterIP antwoordt dan 503.
 
 ## Beheer
 

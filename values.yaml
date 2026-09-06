@@ -63,8 +63,23 @@ server:
   # Keep this false or the server will fail to start once Typesense exists.
   enableServiceLinks: false
 
-  # Extra env vars, e.g. HLS_HWACCEL, ISTER_LANGUAGES, CACHE_CLEANUP_CRON.
+  # Extra env vars, e.g. ISTER_LANGUAGES, CACHE_CLEANUP_CRON.
   extraEnv: []
+
+  service:
+    type: ClusterIP
+    port: 8080
+    # Only used with type NodePort / LoadBalancer. Empty = let Kubernetes pick.
+    nodePort: null
+    annotations: {}
+    labels: {}
+    loadBalancerIP: ""
+    loadBalancerClass: ""
+    externalTrafficPolicy: ""
+    # On an IPv6-primary cluster a Service without these gets an IPv6-only ClusterIP.
+    # The server listens dual-stack, so it needs nothing; see website.service.
+    ipFamilyPolicy: ""
+    ipFamilies: []
 
   podAnnotations: {}
   nodeSelector: {}
@@ -150,6 +165,29 @@ website:
     pullPolicy: IfNotPresent
   replicaCount: 1
   port: 8080
+  # Extra env vars for the nginx that serves the player. CROSS_ORIGIN_ISOLATION=off
+  # disables the COOP/COEP headers (player >= 2.8) if the app is embedded cross-origin.
+  extraEnv: []
+  service:
+    type: ClusterIP
+    port: 8080
+    nodePort: null
+    annotations: {}
+    labels: {}
+    loadBalancerIP: ""
+    loadBalancerClass: ""
+    externalTrafficPolicy: ""
+    # Player images before 2.8 listen on IPv4 only: on an IPv6-primary cluster set
+    # ipFamilyPolicy: SingleStack and ipFamilies: [IPv4], or the Service gets an
+    # IPv6-only ClusterIP and the ingress answers 503 while the pod is fine.
+    ipFamilyPolicy: ""
+    ipFamilies: []
+  # Serve /.well-known/ister (the client discovery document: instance name, OIDC issuer,
+  # API URL) from the website pod, as a file in nginx's html root. Works behind any
+  # ingress controller or Gateway, and even through a plain port-forward — unlike the
+  # ingress-nginx snippet in ingress.wellKnown, which this replaces.
+  wellKnown:
+    enabled: true
   podAnnotations: {}
   nodeSelector: {}
   tolerations: []
@@ -187,24 +225,67 @@ cache:
   retain: true
 
 # ============================================================
-# Ingress
+# Exposure. Pick one: an Ingress (any controller) or a Gateway API HTTPRoute.
+#
+# Whatever fronts ister has to allow three things the defaults of most proxies do not:
+#   - unbounded request bodies: helper nodes POST whole HLS segments and subtitle files
+#     to /api/transcode/upload and /api/cache/upload;
+#   - long-running responses: HLS playback and /api/mediaFile/{id}/download (a helper
+#     reading a multi-GB source with Range requests) run for minutes to hours;
+#   - websocket upgrades on /api/graphql (GraphQL subscriptions).
+# ingress.controller renders the annotations for that per controller; the HTTPRoute
+# sets timeouts.request on the /api rule.
 # ============================================================
 ingress:
   enabled: false
-  className: nginx
+  # Empty = the cluster's default IngressClass. (Was "nginx", which silently routed
+  # nothing on clusters without that class — k3s/Traefik, most cloud providers.)
+  className: ""
+  # Annotation preset for the controller behind ingress.className:
+  #   nginx   — ingress-nginx: proxy-body-size, proxy-read/send-timeout
+  #   traefik — nothing needed: no body limit, timeouts live on the entrypoint
+  #             (entryPoints.<name>.transport.respondingTimeouts); see the docs
+  #   haproxy — haproxy-ingress: timeout-server / timeout-tunnel
+  #   ""      — none; add your own under annotations
+  controller: ""
   host: ""
+  # Merged after the preset, so an entry here overrides it.
   annotations: {}
+  proxy:
+    # Request body limit for the preset, "0" = unlimited.
+    bodySize: "0"
+    # Read/send/tunnel timeout for the preset, in seconds.
+    timeoutSeconds: 3600
   tls:
     enabled: true
     # Empty = "<host with dots replaced by dashes>-tls"
     secretName: ""
     # cert-manager ClusterIssuer. Empty = no cert-manager annotation.
     certIssuer: ""
-  # Serve /.well-known/ister so clients can discover the API and OIDC endpoints.
-  # Implemented as an ingress-nginx server-snippet, which is DISABLED BY DEFAULT in
-  # modern ingress-nginx (allow-snippet-annotations=false). Enable it there first.
+  # Legacy: serve /.well-known/ister from an ingress-nginx server-snippet, which modern
+  # ingress-nginx DISABLES by default (allow-snippet-annotations=false). Superseded by
+  # website.wellKnown, which needs nothing from the controller.
   wellKnown:
     enabled: false
+
+# Gateway API (gateway.networking.k8s.io/v1 HTTPRoute), for Envoy Gateway, Cilium,
+# Istio, Traefik with the Gateway provider, ... The Gateway itself is yours: the chart
+# only attaches a route to it, so the Gateway must allow routes from this namespace.
+gateway:
+  enabled: false
+  # e.g. [ister.example.com]. The first one is also what server.url derives from.
+  hostnames: []
+  # e.g. [{name: public-gateway, namespace: default, sectionName: https-ister}]
+  parentRefs: []
+  annotations: {}
+  # Whether the listener you attach to terminates TLS; only affects the advertised
+  # server.url scheme (the certificate itself belongs to the Gateway).
+  tls: true
+  # Gateway API timeouts on the /api rule. 0s = none (Envoy Gateway's 15s default
+  # cut helper downloads in half). Not every implementation honours them.
+  apiTimeouts:
+    request: 0s
+    backendRequest: ""
 
 # ============================================================
 # Database
@@ -388,6 +469,12 @@ typesense:
       memory: 256Mi
     limits:
       memory: 1Gi
+  service:
+    annotations: {}
+    # Typesense listens on IPv4 only: on an IPv6-primary cluster set
+    # ipFamilyPolicy: SingleStack and ipFamilies: [IPv4].
+    ipFamilyPolicy: ""
+    ipFamilies: []
 
   # Used only when enabled: false.
   external:

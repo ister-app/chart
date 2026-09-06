@@ -11,6 +11,9 @@ Reach it:
 {{- if .Values.ingress.enabled }}
   {{ include "ister.serverUrl" . }}   (API)
   {{ if .Values.ingress.tls.enabled }}https{{ else }}http{{ end }}://{{ .Values.ingress.host }}/   (web)
+{{- else if .Values.gateway.enabled }}
+  {{ include "ister.serverUrl" . }}   (API, HTTPRoute on {{ (first .Values.gateway.parentRefs).name }})
+  {{ if .Values.gateway.tls }}https{{ else }}http{{ end }}://{{ first .Values.gateway.hostnames }}/   (web)
 {{- else }}
   No ingress is configured. Port-forward instead:
 
@@ -31,8 +34,19 @@ server.existingSecret at it (key: tmdb-api-key).
 {{- if and .Values.ingress.enabled .Values.ingress.wellKnown.enabled }}
 
 NOTE: ingress.wellKnown renders an ingress-nginx server-snippet. Modern ingress-nginx
-ships with allow-snippet-annotations=false and silently drops it, in which case
-/.well-known/ister will 404 until you enable that flag in the ingress-nginx ConfigMap.
+ships with allow-snippet-annotations=false and silently drops it. website.wellKnown
+(default on) serves the same document from the website pod on any controller.
+{{- end }}
+{{- if and .Values.ingress.enabled (not .Values.ingress.controller) (not .Values.ingress.annotations) }}
+
+NOTE: ingress.controller is empty, so no body-size/timeout annotations were rendered.
+Helper-node uploads and long HLS sessions need them on most controllers — set
+ingress.controller (nginx | traefik | haproxy) or add the annotations yourself.
+{{- end }}
+{{- if and (not .Values.ingress.enabled) (not .Values.gateway.enabled) (not .Values.server.url) }}
+
+NOTE: without ingress, gateway or server.url the advertised API URL is
+{{ include "ister.serverUrl" . }} — fine for a port-forward, wrong for anything else.
 {{- end }}
 {{- if eq .Values.database.mode "internal" }}
 
