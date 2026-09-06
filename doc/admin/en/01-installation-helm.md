@@ -176,6 +176,16 @@ which the device cgroup only allows for a privileged container (`hwaccel.privile
 Add the node's `video`/`render` group ids to `hwaccel.supplementalGroups` when the device
 is group-owned.
 
+## Network policies and pod security
+
+`networkPolicy.enabled: true` renders ingress-only NetworkPolicies: the datastores accept
+traffic from this release's pods only, the server, helpers and website also from
+`networkPolicy.ingressFrom` — add your ingress controller's or Gateway's namespace there,
+and Prometheus for the monitor port. Egress stays open (metadata sources, podcast feeds,
+your OIDC issuer). The pods pass the "restricted" Pod Security Standard; on OpenShift set
+`runAsUser`/`fsGroup` to `null` in the `podSecurityContext` blocks so the SCC assigns
+the UID.
+
 ## Operations
 
 - **Upgrades**: `helm upgrade ister oci://ghcr.io/ister-app/charts/ister --version <v>`

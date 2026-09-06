@@ -169,6 +169,8 @@ server:
     limits:
       memory: 4Gi
 
+  # Passes the "restricted" Pod Security Standard. On OpenShift (arbitrary UIDs from
+  # the namespace range) set runAsUser and fsGroup to null so the SCC assigns them.
   podSecurityContext:
     runAsNonRoot: true
     runAsUser: 1000
@@ -649,6 +651,19 @@ monitoring:
   # Extra labels so your Prometheus instance selects this ServiceMonitor.
   serviceMonitorLabels: {}
   interval: 30s
+
+# ============================================================
+# NetworkPolicies (ingress only; egress stays open for the metadata sources and OIDC).
+# The datastores accept traffic from this release's pods only; the server, helpers and
+# website also from ingressFrom — your ingress controller / Gateway namespace, and
+# Prometheus for the monitor port. Needs a CNI that enforces NetworkPolicy.
+# ============================================================
+networkPolicy:
+  enabled: false
+  # Extra NetworkPolicyPeers, e.g.
+  # - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: ingress-nginx}}
+  # - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: envoy-gateway-system}}
+  ingressFrom: []
 
 # ============================================================
 # PodDisruptionBudgets
