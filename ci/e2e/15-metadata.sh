@@ -5,25 +5,47 @@
 # worker's whole fetch → metadata → search-index pipeline works without internet.
 # Enrichment is asynchronous (RabbitMQ per entity), so poll.
 
+# Only some movie fixtures have a TMDB stub pair and movies() has no defined order, so ask
+# whether ANY movie got enriched — movies(size: 1) passed only as long as a stubbed one
+# happened to come back first.
 echo "--> Waiting for TMDB movie metadata (up to ${METADATA_TIMEOUT_SECONDS:-180}s)"
 movie_enriched() {
-  movie=$(gql '{ movies(size: 1) { content { name metadata { title description sourceUri } } } }')
-  echo "$movie" | jq -e '[.data.movies.content[0].metadata[]? | select(.description != null and .description != "")] | length > 0' >/dev/null
+  movies=$(gql '{ movies(size: 50) { content { id name contentRating keywords trailerKey trailerSite metadata { title description sourceUri } } } }')
+  enriched_movie=$(echo "$movies" | jq -c '[.data.movies.content[]
+      | select([.metadata[]? | select(.description != null and .description != "")] | length > 0)]
+      | first // empty')
+  [ -n "$enriched_movie" ]
 }
 poll_until "${METADATA_TIMEOUT_SECONDS:-180}" "movie metadata from TMDB" movie_enriched
 
+# The language-independent extras come from four more TMDB endpoints than the details call
+# (release_dates, videos, keywords). The worker degrades to a null field on failure rather
+# than dead-lettering, so without this assertion an unstubbed endpoint passes CI silently.
+echo "--> Asserting the TMDB movie extras (certification, trailer, keywords)"
+echo "$enriched_movie" | jq -e '.contentRating == "PG-13" and .trailerSite == "YouTube"
+    and .trailerKey != null and (.keywords // "") != ""' >/dev/null \
+  || fail "movie extras did not land: $enriched_movie"
+
 echo "--> Waiting for TMDB show metadata"
 show_enriched() {
-  show=$(gql '{ shows(size: 5) { content { name metadata { description } } } }')
-  echo "$show" | jq -e '[.data.shows.content[].metadata[]? | select(.description != null and .description != "")] | length > 0' >/dev/null
+  shows=$(gql '{ shows(size: 20) { content { name contentRating imdbId keywords trailerKey trailerSite metadata { description } } } }')
+  enriched_show=$(echo "$shows" | jq -c '[.data.shows.content[]
+      | select([.metadata[]? | select(.description != null and .description != "")] | length > 0)]
+      | first // empty')
+  [ -n "$enriched_show" ]
 }
 poll_until "${METADATA_TIMEOUT_SECONDS:-180}" "show metadata from TMDB" show_enriched
 
+echo "--> Asserting the TMDB show extras (rating, imdb id, trailer, keywords)"
+echo "$enriched_show" | jq -e '.contentRating == "TV-PG" and .imdbId != null
+    and .trailerSite == "YouTube" and .trailerKey != null and (.keywords // "") != ""' >/dev/null \
+  || fail "show extras did not land: $enriched_show"
+
+# Credits are only fetched for a movie TMDB actually matched, so ask the enriched one.
 echo "--> Waiting for cast credits (TMDB movie credits + person)"
+enriched_movie_id=$(echo "$enriched_movie" | jq -r '.id')
 cast_present() {
-  movie_id=$(gql '{ movies(size: 1) { content { id } } }' | jq -r '.data.movies.content[0].id // empty')
-  [ -n "$movie_id" ] || return 1
-  cast=$(gql "{ cast(movieId: \"$movie_id\") { content { person { name } } } }")
+  cast=$(gql "{ cast(movieId: \"$enriched_movie_id\") { content { person { name } } } }")
   echo "$cast" | jq -e '.data.cast.content | length > 0' >/dev/null
 }
 poll_until "${METADATA_TIMEOUT_SECONDS:-180}" "movie cast from TMDB" cast_present

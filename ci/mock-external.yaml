@@ -707,6 +707,72 @@ data:
         "jsonBody": {"cast": [], "guest_stars": []}
       }
     }
+  # The language-independent extras (TmdbExtrasService), fetched once per movie/show on top
+  # of the per-language details call. The worker degrades to a null field when one of these
+  # fails, so an unstubbed endpoint here does NOT dead-letter — it just quietly leaves
+  # contentRating/trailer/keywords/imdbId empty. 15-metadata.sh asserts the values below so
+  # that stays visible. Generic on the id: every fixture gets the same extras.
+  tmdb-extras.json: |
+    {
+      "mappings": [
+        {
+          "request": {"method": "GET", "urlPathPattern": "/tmdb/3/movie/[0-9]+/release_dates"},
+          "response": {
+            "status": 200,
+            "headers": {"Content-Type": "application/json"},
+            "jsonBody": {"results": [{"iso_3166_1": "US", "release_dates": [{"certification": "PG-13", "type": 3}]}]}
+          }
+        },
+        {
+          "request": {"method": "GET", "urlPathPattern": "/tmdb/3/movie/[0-9]+/videos"},
+          "response": {
+            "status": 200,
+            "headers": {"Content-Type": "application/json"},
+            "jsonBody": {"results": [{"key": "movie-trailer", "site": "YouTube", "type": "Trailer", "official": true}]}
+          }
+        },
+        {
+          "request": {"method": "GET", "urlPathPattern": "/tmdb/3/movie/[0-9]+/keywords"},
+          "response": {
+            "status": 200,
+            "headers": {"Content-Type": "application/json"},
+            "jsonBody": {"keywords": [{"id": 401, "name": "wildlife"}, {"id": 402, "name": "nature"}]}
+          }
+        },
+        {
+          "request": {"method": "GET", "urlPathPattern": "/tmdb/3/tv/[0-9]+/content_ratings"},
+          "response": {
+            "status": 200,
+            "headers": {"Content-Type": "application/json"},
+            "jsonBody": {"results": [{"iso_3166_1": "US", "rating": "TV-PG"}]}
+          }
+        },
+        {
+          "request": {"method": "GET", "urlPathPattern": "/tmdb/3/tv/[0-9]+/external_ids"},
+          "response": {
+            "status": 200,
+            "headers": {"Content-Type": "application/json"},
+            "jsonBody": {"imdb_id": "tt0000001"}
+          }
+        },
+        {
+          "request": {"method": "GET", "urlPathPattern": "/tmdb/3/tv/[0-9]+/videos"},
+          "response": {
+            "status": 200,
+            "headers": {"Content-Type": "application/json"},
+            "jsonBody": {"results": [{"key": "show-trailer", "site": "YouTube", "type": "Trailer", "official": true}]}
+          }
+        },
+        {
+          "request": {"method": "GET", "urlPathPattern": "/tmdb/3/tv/[0-9]+/keywords"},
+          "response": {
+            "status": 200,
+            "headers": {"Content-Type": "application/json"},
+            "jsonBody": {"results": [{"id": 411, "name": "nature"}, {"id": 412, "name": "documentary"}]}
+          }
+        }
+      ]
+    }
   tmdb-person-details.json: |
     {
       "request": {"method": "GET", "urlPathPattern": "/tmdb/3/person/[0-9]+"},

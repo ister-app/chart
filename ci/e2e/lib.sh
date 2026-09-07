@@ -71,6 +71,21 @@ mint_token() { TOKEN=$(_mint ister); }
 # mutations keep using $TOKEN so the plain-user path stays covered.
 mint_admin_token() { ADMIN_TOKEN=$(_mint ister-admin); }
 
+# Picks a movie with a media file of at least the given length, as "movieId<TAB>mediaFileId".
+# movies() has no defined order and the fixtures are a mix of 2- and 3-minute files, so a
+# scenario that needs a particular length must ask for it instead of taking movies(size: 1)
+# and hoping — that bet only paid off because the 3-minute Tiger happened to come back first.
+pick_movie() { # minimum duration in milliseconds
+  gql '{ movies(size: 50) { content { id mediaFile { id durationInMilliseconds } } } }' \
+    | jq -r --argjson min "$1" '
+        [.data.movies.content[]
+         | .id as $movie
+         | .mediaFile[]?
+         | select(.durationInMilliseconds >= $min)
+         | "\($movie)\t\(.id)"]
+        | first // empty'
+}
+
 # Polls a command until it exits 0, up to a deadline. Usage:
 #   poll_until <timeout_seconds> <description> <command...>
 # The command is run with eval so it can be a pipeline in a single string.

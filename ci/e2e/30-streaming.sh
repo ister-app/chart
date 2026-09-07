@@ -10,8 +10,7 @@ stream_token=$(gql 'mutation { createStreamToken { token } }' | jq -r '.data.cre
 [ -n "$stream_token" ] || fail "createStreamToken returned no token"
 
 echo "--> Picking a movie's media file"
-MOVIE_MEDIA_FILE_ID=$(gql '{ movies(size: 1) { content { name mediaFile { id } } } }' \
-  | jq -r '.data.movies.content[0].mediaFile[0].id // empty')
+MOVIE_MEDIA_FILE_ID=$(pick_movie 0 | cut -f2)
 [ -n "$MOVIE_MEDIA_FILE_ID" ] || fail "no movie media file found"
 export MOVIE_MEDIA_FILE_ID
 echo "    mediaFileId: $MOVIE_MEDIA_FILE_ID"

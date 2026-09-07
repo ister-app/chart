@@ -2,11 +2,15 @@
 #
 # Mirrors what the player does: create a play queue for a movie, send the
 # updatePlayQueue heartbeat with a playback position, and assert the movie shows up in
-# recentlyWatched. Runs after 30-streaming.sh, which exported MOVIE_MEDIA_FILE_ID.
+# recentlyWatched.
 
-echo "--> Picking a movie"
-movie_id=$(gql '{ movies(size: 1) { content { id name } } }' | jq -r '.data.movies.content[0].id // empty')
-[ -n "$movie_id" ] || fail "no movie found"
+# The heartbeat below must land mid-movie: the server counts a position within a minute
+# of the end as finished (PlayQueueService.updateWatchStatus), and a finished movie has
+# nothing left to resume, so it drops straight back out of recentlyWatched. That rules
+# out the 2-minute fixtures — 120s - 90s is under the minute — hence the length floor.
+echo "--> Picking a movie long enough to be left mid-way"
+movie_id=$(pick_movie 170000 | cut -f1)
+[ -n "$movie_id" ] || fail "no movie of at least 170s found"
 
 echo "--> Creating a play queue"
 queue=$(gql "mutation { createPlayQueue(input: { sourceType: MOVIE, sourceId: \"$movie_id\" }) { id currentItemId } }")
@@ -14,8 +18,6 @@ queue_id=$(echo "$queue" | jq -r '.data.createPlayQueue.id // empty')
 item_id=$(echo "$queue" | jq -r '.data.createPlayQueue.currentItemId // empty')
 [ -n "$queue_id" ] && [ -n "$item_id" ] || fail "createPlayQueue failed: $queue"
 
-# The server only records watch status beyond 60s of progress; 90s is mid-movie for
-# the 3-minute fixtures, so it registers as "in progress" rather than "finished".
 echo "--> Sending playback heartbeats (90s into the movie)"
 updated=$(gql "mutation { updatePlayQueue(id: \"$queue_id\", progressInMilliseconds: 90000, playQueueItemId: \"$item_id\", playState: PLAYING) { id } }")
 echo "$updated" | jq -e '.data.updatePlayQueue.id' >/dev/null \
