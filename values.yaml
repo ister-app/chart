@@ -499,7 +499,7 @@ rabbitmq:
   enabled: true
   image:
     repository: rabbitmq
-    tag: "4.2.5-management-alpine"
+    tag: "4.3.5-management-alpine"
     digest: ""
     pullPolicy: IfNotPresent
   auth:
