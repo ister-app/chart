@@ -1,5 +1,50 @@
 # Changelog
 
+## ister-chart v1.0.0
+
+| Component | Image | Version |
+|---|---|---|
+| server | `ghcr.io/ister-app/server` | 3.5.1 |
+| website | `ghcr.io/ister-app/player` | 2.7.1 |
+| migrations | `ghcr.io/ister-app/migrations` | 3.5.1 |
+| database | `postgres` | 18 |
+| typesense | `docker.io/typesense/typesense` | 30.2 |
+| rabbitmq | `rabbitmq` | 4.2.5-management-alpine |
+
+### Breaking changes
+
+- feat!: bundle RabbitMQ as the chart's own StatefulSet instead of the Bitnami subchart ([`69c59d2`](https://github.com/ister-app/chart/commit/69c59d2))
+
+### Features
+
+- feat: NetworkPolicy template and Pod Security notes ([`d78769d`](https://github.com/ister-app/chart/commit/d78769d))
+- feat: helper-node pods, hardware encoding, external service URLs and pod escape hatches ([`40bdcbb`](https://github.com/ister-app/chart/commit/40bdcbb))
+- feat: controller-neutral exposure — Gateway API route, ingress presets, service knobs ([`03db8c0`](https://github.com/ister-app/chart/commit/03db8c0))
+
+### Fixes
+
+- fix: external typesense secret, broker/search ports, flyway tag and a strict schema ([`6f4597e`](https://github.com/ister-app/chart/commit/6f4597e))
+
+### Dependency updates
+
+- chore(deps): update ghcr.io/ister-app/server docker tag to v3.5.1 ([`b637d42`](https://github.com/ister-app/chart/commit/b637d42))
+- chore(deps): update ghcr.io/ister-app/server docker tag to v3.5.0 ([`6484f0b`](https://github.com/ister-app/chart/commit/6484f0b))
+- chore(deps): update renovatebot/github-action action to v46.2.6 ([`fbddc22`](https://github.com/ister-app/chart/commit/fbddc22))
+
+### Other
+
+- ci: pick e2e fixtures by what they need, and stub the TMDB extras ([`d0fc5fa`](https://github.com/ister-app/chart/commit/d0fc5fa))
+- ci: poll the master playlist in the streaming scenario, ClusterIP Envoy on kind ([`dc29f83`](https://github.com/ister-app/chart/commit/dc29f83))
+- ci: exercise ingress-nginx and Envoy Gateway, an older Kubernetes, and the upgrade path ([`c0f3f08`](https://github.com/ister-app/chart/commit/c0f3f08))
+
+### Install
+
+```sh
+helm install ister oci://ghcr.io/ister-app/charts/ister --version 1.0.0
+```
+
+**Full changelog**: https://github.com/ister-app/chart/compare/v0.5.1...v1.0.0
+
 ## ister-chart v0.5.1
 
 | Component | Image | Version |
