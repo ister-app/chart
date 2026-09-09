@@ -426,7 +426,10 @@ database:
   internal:
     image:
       repository: postgres
-      tag: "18"
+      # Pinned to a patch, not the floating "18": a floating major tag moves under you
+      # on every pull and there is nothing in git that says which PostgreSQL a release
+      # actually shipped. Renovate keeps this current (docker patches automerge).
+      tag: "18.6"
       pullPolicy: IfNotPresent
     dbName: ister
     user: ister
@@ -664,7 +667,7 @@ flyway:
   # its helm-values manager only recognises the structured form.
   waitImage:
     repository: postgres
-    tag: "18-alpine"
+    tag: "18.6-alpine"
     pullPolicy: IfNotPresent
   resources:
     requests:
