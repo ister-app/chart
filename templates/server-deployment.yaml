@@ -230,6 +230,12 @@ spec:
             {{- range .Values.server.mediaVolumes }}
             - name: media-{{ .name }}
               mountPath: {{ trimSuffix "/" .mountPath }}
+              {{- with .subPath }}
+              # One claim can carry several libraries in subdirectories; without this
+              # every entry would mount the same tree and every library would scan all
+              # of it.
+              subPath: {{ trimAll "/" . | quote }}
+              {{- end }}
               {{- if .readOnly }}
               readOnly: true
               {{- end }}

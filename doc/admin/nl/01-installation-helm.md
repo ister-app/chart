@@ -26,7 +26,9 @@ mediavolumes — genoeg om het te proberen, geen productie-opstelling.
 
 - Een Kubernetes-cluster en Helm 3.
 - Een [TMDB API-key](https://www.themoviedb.org/settings/api) voor film-/seriemetadata.
-- Een OIDC-issuer (bijvoorbeeld Keycloak) — ister beheert zelf geen gebruikers.
+- Een OIDC-issuer (bijvoorbeeld Keycloak) — ister beheert zelf geen gebruikers. Die moet
+  op een bepaalde manier ingericht zijn; zie
+  [De identity provider instellen](02-identity-provider.md).
 - Voor `database.mode: cnpg`: de [CloudNativePG](https://cloudnative-pg.io/)-operator.
 - Voor ingress met TLS: een ingress-controller en optioneel cert-manager.
 
@@ -96,6 +98,13 @@ diens `existingSecret` heeft de sleutel `api-key` nodig.
   waarde — anders zou elke `helm upgrade` de server buiten zijn eigen database sluiten.
   Daarom verschilt de uitvoer van `helm template` ook van wat `helm install`
   daadwerkelijk toepast.
+- **...maar niet onder GitOps.** Argo CD, Flux en `helm template | kubectl apply`
+  renderen zonder toegang tot het cluster, dus die lookup vindt niets en elke sync
+  genereert een nieuw wachtwoord. PostgreSQL houdt het eerste in zijn volume en de server
+  strandt daarna op `password authentication failed`; al het andere herstart bij elke
+  commit via de `checksum/secrets`-annotatie. Zo uitrollen betekent
+  `database.internal.password`, `rabbitmq.auth.password` en `typesense.apiKey` expliciet
+  zetten, of het bijbehorende `existingSecret` naar een Secret in eigen beheer wijzen.
 - **Een Secret roteren herstart de server.** Alle credentials worden gehasht in een
   `checksum/secrets`-podannotatie, dus een gewijzigd Secret rolt de Deployment.
 
@@ -182,6 +191,54 @@ voorkeur een device-plugin (`hwaccel.resources`, bijvoorbeeld `gpu.intel.com/i91
 devicebestand van de node, wat de device-cgroup alleen toestaat voor een privileged
 container (`hwaccel.privileged`). Zet de group-id's van `video`/`render` van de node in
 `hwaccel.supplementalGroups` als het device group-eigendom is.
+
+## Adresfamilies: dual-stack en IPv6-only clusters
+
+De chart draait op een IPv4-only, een dual-stack of een IPv6-only cluster, met één
+kanttekening die van het image is en niet van de chart. Er gaan twee losse dingen mis als
+een container alleen op IPv4 luistert, en die zijn de moeite waard uit elkaar te houden:
+
+1. **Zijn Service.** Zonder expliciete `ipFamilies` krijgt een Service op een
+   IPv6-primair cluster een IPv6-ClusterIP, en daar antwoordt de container nooit. Dat
+   leest als een gecrashte applicatie, maar het is een netwerkkeuze.
+2. **Zijn probes.** kubelet richt een `httpGet`-probe op het *eerste* pod-IP, en dat is op
+   zo'n cluster het IPv6-adres. De probe faalt dan tegen een pod die zijn Service prima
+   bedient, en een liveness-probe herstart hem eindeloos.
+
+Waar elk onderdeel staat, gemeten op kind met `ipFamily: ipv4`, kind met `ipFamily: ipv6`
+en een dual-stack cluster:
+
+| Component | IPv4-only | dual-stack, IPv6-primair | IPv6-only |
+|---|---|---|---|
+| server | werkt | werkt | werkt |
+| PostgreSQL (internal) | werkt | werkt | werkt |
+| RabbitMQ (AMQP) | werkt | werkt | werkt |
+| Typesense | werkt | werkt | werkt |
+| website | werkt | werkt | werkt |
+| website, player gepind op ≤ 2.7 | werkt | Service-pin nodig | onbereikbaar |
+
+- **Typesense** luistert dual-stack doordat `typesense.apiAddress` standaard `::` is. De
+  eigen standaard van het image is `0.0.0.0`, en die faalt op beide manieren hierboven.
+  Zet hem alleen terug op `0.0.0.0` op nodes waar IPv6 in de kernel uit staat.
+- **De server, PostgreSQL en de AMQP-listener van RabbitMQ** binden uit zichzelf al `::`.
+  De management-, Prometheus- en Erlang-distributielisteners van RabbitMQ zijn IPv4-only,
+  maar niets in deze chart benadert die over het netwerk: `rabbitmq-diagnostics` praat met
+  de lokale node, en 127.0.0.1 bestaat in een pod op elk cluster.
+- **De webplayer** luistert dual-stack vanaf image 2.8, en dat is wat de chart pint. Pin
+  je een oudere, dan is zijn nginx weer IPv4-only: op een dual-stack cluster heeft zijn
+  Service dan dit nodig:
+
+  ```yaml
+  website:
+    service:
+      ipFamilyPolicy: SingleStack
+      ipFamilies: [IPv4]
+  ```
+
+  en op een IPv6-only cluster is hij dan helemaal niet te bereiken. De API heeft er geen
+  last van. Zijn readiness-probe loopt over `127.0.0.1` binnen de container, dus met zo'n
+  pin meldt de pod Ready ook waar zijn Service dood is — kijk naar de Service en niet naar
+  de pod als de player niet laadt.
 
 ## Netwerkbeleid en podbeveiliging
 

@@ -58,6 +58,14 @@ jobs:
           helm template ister . -f ci/values-ci.yaml -f ci/values-ingress-nginx.yaml > /dev/null
           helm template ister . -f ci/values-ci.yaml -f ci/values-gateway-envoy.yaml > /dev/null
           helm template ister . -f ci/values-upgrade-to.yaml > /dev/null
+          # Typesense back on the image's IPv4-only default, the escape hatch for nodes
+          # with IPv6 disabled in the kernel. The dual-stack default is what the e2e
+          # below already runs.
+          helm template ister . -f ci/values-ci.yaml --set typesense.apiAddress=0.0.0.0 > /dev/null
+          # Both probe sets off, the escape hatch when a container listens on a family
+          # kubelet does not probe.
+          helm template ister . -f ci/values-ci.yaml \
+            --set typesense.probes.enabled=false --set website.probes.enabled=false > /dev/null
           # All-external: no bundled datastores at all.
           helm template ister . \
             --set server.tmdbApiKey=x --set server.oidc.url=https://oidc.example/realms/a \

@@ -220,6 +220,9 @@ server:
   # APP_ISTER_DISK_DIRECTORIES_<i>_*, unless library is omitted (mount only).
   # Exactly one source per entry: hostPath | existingClaim | nfs.
   # NOTE: no trailing slash on mountPath — the scanner skips the tree if there is one.
+  # subPath picks one directory out of the source, so a single claim or export can
+  # carry several libraries; without it every entry mounts the whole tree and every
+  # library scans all of it.
   mediaVolumes: []
   # - name: shows
   #   library: shows
@@ -229,7 +232,8 @@ server:
   # - name: music
   #   library: music
   #   mountPath: /mnt/music
-  #   existingClaim: media-music
+  #   existingClaim: media
+  #   subPath: music
 
 # ============================================================
 # Helper nodes: extra server pods that own no media but take the heavy job families
@@ -267,6 +271,9 @@ website:
   image:
     repository: ghcr.io/ister-app/player
     # Versioned independently of the server — see the note on server.image.tag.
+    # 2.8.0 is a floor worth knowing about, not just a routine bump: from it the image's
+    # nginx listens dual-stack and sets the COOP/COEP headers itself, so an IPv6-only
+    # cluster reaches the player and no Service pin or route filter is needed for it.
     tag: "2.8.0"
     digest: ""
     pullPolicy: IfNotPresent
@@ -284,9 +291,10 @@ website:
     loadBalancerIP: ""
     loadBalancerClass: ""
     externalTrafficPolicy: ""
-    # Player images before 2.8 listen on IPv4 only: on an IPv6-primary cluster set
-    # ipFamilyPolicy: SingleStack and ipFamilies: [IPv4], or the Service gets an
-    # IPv6-only ClusterIP and the ingress answers 503 while the pod is fine.
+    # From player 2.8 the image listens dual-stack, so no pin is needed on any cluster.
+    # Only if you pin an OLDER player on an IPv6-primary cluster does this Service need
+    # ipFamilyPolicy: SingleStack and ipFamilies: [IPv4] — such an image listens on IPv4
+    # only, and the ingress answers 503 while the pod looks fine.
     ipFamilyPolicy: ""
     ipFamilies: []
   # Serve /.well-known/ister (the client discovery document: instance name, OIDC issuer,
@@ -393,6 +401,22 @@ gateway:
   apiTimeouts:
     request: 0s
     backendRequest: ""
+  # Extra HTTPRoute filters per rule — the Gateway API's equivalent of
+  # ingress.annotations, which the Ingress path already has. From player 2.8 the image
+  # sets the cross-origin isolation headers itself (website.extraEnv:
+  # CROSS_ORIGIN_ISOLATION=off turns them off), so this is for your own headers, or for
+  # putting them back when you pin an older player:
+  #
+  # websiteFilters:
+  #   - type: ResponseHeaderModifier
+  #     responseHeaderModifier:
+  #       set:
+  #         - name: Cross-Origin-Opener-Policy
+  #           value: same-origin
+  #         - name: Cross-Origin-Embedder-Policy
+  #           value: require-corp
+  apiFilters: []
+  websiteFilters: []
 
 # ============================================================
 # Database
@@ -407,7 +431,10 @@ database:
   internal:
     image:
       repository: postgres
-      tag: "18"
+      # Pinned to a patch, not the floating "18": a floating major tag moves under you
+      # on every pull and there is nothing in git that says which PostgreSQL a release
+      # actually shipped. Renovate keeps this current (docker patches automerge).
+      tag: "18.6"
       pullPolicy: IfNotPresent
     dbName: ister
     user: ister
@@ -499,7 +526,7 @@ rabbitmq:
   enabled: true
   image:
     repository: rabbitmq
-    tag: "4.2.5-management-alpine"
+    tag: "4.3.5-management-alpine"
     digest: ""
     pullPolicy: IfNotPresent
   auth:
@@ -569,6 +596,20 @@ typesense:
     pullPolicy: IfNotPresent
   port: 8108
   collection: media
+  # Address the API listens on. "::" listens dual-stack, which is the only setting that
+  # works on all three cluster families: the image's own default (0.0.0.0) is IPv4-only,
+  # so on an IPv6-primary cluster Typesense answers on neither the address its Service
+  # hands out nor the one kubelet probes, and on an IPv6-only cluster it is unreachable
+  # altogether. Measured on kind ipv4, kind ipv6 and a dual-stack cluster: "::" answers
+  # on the pod IP in all three (IPv4 arrives v4-mapped).
+  # Set "0.0.0.0" if your nodes run with IPv6 disabled in the kernel, where binding ::
+  # fails outright.
+  apiAddress: "::"
+  # httpGet probes, which kubelet aims at the pod's first IP -- see apiAddress. The
+  # image ships no curl, wget or nc, so there is no exec probe to fall back on; turn
+  # them off if you cannot make Typesense listen on the right family.
+  probes:
+    enabled: true
   # Provide via existingSecret (key: api-key) outside of dev.
   apiKey: ""
   existingSecret: ""
@@ -598,8 +639,9 @@ typesense:
       memory: 1Gi
   service:
     annotations: {}
-    # Typesense listens on IPv4 only: on an IPv6-primary cluster set
-    # ipFamilyPolicy: SingleStack and ipFamilies: [IPv4].
+    # With the default typesense.apiAddress ("::") no pin is needed on any cluster.
+    # Only if you set apiAddress back to 0.0.0.0 on an IPv6-primary cluster does this
+    # Service need ipFamilyPolicy: SingleStack and ipFamilies: [IPv4].
     ipFamilyPolicy: ""
     ipFamilies: []
 
@@ -634,7 +676,7 @@ flyway:
   # its helm-values manager only recognises the structured form.
   waitImage:
     repository: postgres
-    tag: "18-alpine"
+    tag: "18.6-alpine"
     pullPolicy: IfNotPresent
   resources:
     requests:
@@ -679,5 +721,5 @@ podDisruptionBudget:
 tests:
   image:
     repository: curlimages/curl
-    tag: "8.21.0"
+    tag: "8.22.0"
     pullPolicy: IfNotPresent

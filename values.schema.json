@@ -217,6 +217,9 @@
                 "type": "string",
                 "pattern": "^/"
               },
+              "subPath": {
+                "type": "string"
+              },
               "library": {
                 "type": "string"
               },
@@ -1074,6 +1077,17 @@
         "collection": {
           "type": "string"
         },
+        "apiAddress": {
+          "type": "string"
+        },
+        "probes": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            }
+          }
+        },
         "apiKey": {
           "type": "string"
         },
@@ -1278,6 +1292,18 @@
             "backendRequest": {
               "type": "string"
             }
+          }
+        },
+        "apiFilters": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "websiteFilters": {
+          "type": "array",
+          "items": {
+            "type": "object"
           }
         }
       }
