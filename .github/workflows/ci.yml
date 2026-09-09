@@ -58,6 +58,13 @@ jobs:
           helm template ister . -f ci/values-ci.yaml -f ci/values-ingress-nginx.yaml > /dev/null
           helm template ister . -f ci/values-ci.yaml -f ci/values-gateway-envoy.yaml > /dev/null
           helm template ister . -f ci/values-upgrade-to.yaml > /dev/null
+          # Typesense listening dual-stack, for an IPv6-primary cluster. Render-only:
+          # kind is single-stack, so this is not exercised by the e2e below.
+          helm template ister . -f ci/values-ci.yaml --set typesense.apiAddress=:: > /dev/null
+          # Both probe sets off, the escape hatch when a container listens on a family
+          # kubelet does not probe.
+          helm template ister . -f ci/values-ci.yaml \
+            --set typesense.probes.enabled=false --set website.probes.enabled=false > /dev/null
           # All-external: no bundled datastores at all.
           helm template ister . \
             --set server.tmdbApiKey=x --set server.oidc.url=https://oidc.example/realms/a \

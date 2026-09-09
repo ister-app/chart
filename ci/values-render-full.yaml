@@ -16,8 +16,11 @@ server:
     offloadJobs: [DETECT_SEGMENTS, SUBTITLES]
   libraries:
     - {name: shows, type: SHOW}
+    - {name: movies, type: MOVIE}
   mediaVolumes:
     - {name: shows, library: shows, mountPath: /media/shows, hostPath: /srv/shows}
+    # subPath: two libraries out of one claim.
+    - {name: movies, library: movies, mountPath: /media/movies, existingClaim: media, subPath: movies}
   extraEnvFrom:
     - configMapRef: {name: more-settings}
   extraVolumes:
@@ -63,3 +66,22 @@ monitoring:
   enabled: true
 podDisruptionBudget:
   enabled: true
+
+# De HTTPRoute met beide ontsnappingsluiken: de Gateway API-tegenhanger van
+# ingress.annotations.
+gateway:
+  enabled: true
+  hostnames: [ister.example.com]
+  parentRefs:
+    - {name: public-gateway, namespace: default, sectionName: https-ister}
+  websiteFilters:
+    - type: ResponseHeaderModifier
+      responseHeaderModifier:
+        set:
+          - {name: Cross-Origin-Opener-Policy, value: same-origin}
+          - {name: Cross-Origin-Embedder-Policy, value: require-corp}
+  apiFilters:
+    - type: ResponseHeaderModifier
+      responseHeaderModifier:
+        add:
+          - {name: X-Ister-Node, value: full}
