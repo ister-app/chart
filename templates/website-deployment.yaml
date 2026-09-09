@@ -69,9 +69,12 @@ spec:
           {{- $probe := list "curl" "-fsS" "-o" "/dev/null" (printf "http://127.0.0.1:%d%s" (int .Values.website.port) .Values.website.probes.path) }}
           # exec and not httpGet, for the same reason the database and broker probes are
           # exec: kubelet aims an httpGet at the pod's FIRST IP, which on an
-          # IPv6-primary cluster is the IPv6 one, and the player image's nginx listens
-          # on IPv4 only. That restarted a healthy pod in a loop while its Service
-          # answered fine. 127.0.0.1 inside the container is right either way.
+          # IPv6-primary cluster is the IPv6 one. The pinned image listens dual-stack
+          # from 2.8 and would survive that, but an older website.image.tag does not --
+          # it listens on IPv4 only, and the probe restarted a healthy pod in a loop
+          # while its Service answered fine. 127.0.0.1 is right for any pinned version.
+          # It does mean the pod reports Ready even when such an image is unreachable
+          # over an IPv6-only Service; see the address families chapter.
           readinessProbe:
             exec:
               command: {{ toJson $probe }}

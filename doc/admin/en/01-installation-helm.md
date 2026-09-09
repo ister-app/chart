@@ -206,7 +206,8 @@ Where each component stands, measured on kind with `ipFamily: ipv4`, kind with
 | PostgreSQL (internal) | works | works | works |
 | RabbitMQ (AMQP) | works | works | works |
 | Typesense | works | works | works |
-| website (player ≤ 2.7) | works | needs a Service pin | **unreachable** |
+| website | works | works | works |
+| website, player pinned ≤ 2.7 | works | needs a Service pin | unreachable |
 
 - **Typesense** listens dual-stack because `typesense.apiAddress` defaults to `::`. The
   image's own default is `0.0.0.0`, which fails both ways above. Set it back to
@@ -215,8 +216,9 @@ Where each component stands, measured on kind with `ipFamily: ipv4`, kind with
   RabbitMQ's management, Prometheus and Erlang-distribution listeners are IPv4-only, but
   nothing in this chart reaches them across the network: `rabbitmq-diagnostics` talks to
   the local node, and 127.0.0.1 exists in a pod on any cluster.
-- **The web player** is the one gap. Its nginx listens on IPv4 only up to and including
-  2.7, so on a dual-stack cluster its Service needs
+- **The web player** listens dual-stack from image 2.8, which is what the chart pins.
+  Pin an older one and its nginx is IPv4-only again: on a dual-stack cluster its Service
+  then needs
 
   ```yaml
   website:
@@ -225,10 +227,10 @@ Where each component stands, measured on kind with `ipFamily: ipv4`, kind with
       ipFamilies: [IPv4]
   ```
 
-  and on an IPv6-only cluster it cannot be reached at all until you run a newer image,
-  which listens on both. The API is unaffected either way. Its readiness probe runs over
-  `127.0.0.1` inside the container, so the pod reports Ready even where its Service is
-  dead — check the Service, not the pod, if the player does not load.
+  and on an IPv6-only cluster it cannot be reached at all. The API is unaffected either
+  way. Its readiness probe runs over `127.0.0.1` inside the container, so with such a pin
+  the pod reports Ready even where its Service is dead — check the Service, not the pod,
+  if the player does not load.
 
 ## Network policies and pod security
 

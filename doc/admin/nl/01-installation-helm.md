@@ -214,7 +214,8 @@ en een dual-stack cluster:
 | PostgreSQL (internal) | werkt | werkt | werkt |
 | RabbitMQ (AMQP) | werkt | werkt | werkt |
 | Typesense | werkt | werkt | werkt |
-| website (player ≤ 2.7) | werkt | Service-pin nodig | **onbereikbaar** |
+| website | werkt | werkt | werkt |
+| website, player gepind op ≤ 2.7 | werkt | Service-pin nodig | onbereikbaar |
 
 - **Typesense** luistert dual-stack doordat `typesense.apiAddress` standaard `::` is. De
   eigen standaard van het image is `0.0.0.0`, en die faalt op beide manieren hierboven.
@@ -223,8 +224,9 @@ en een dual-stack cluster:
   De management-, Prometheus- en Erlang-distributielisteners van RabbitMQ zijn IPv4-only,
   maar niets in deze chart benadert die over het netwerk: `rabbitmq-diagnostics` praat met
   de lokale node, en 127.0.0.1 bestaat in een pod op elk cluster.
-- **De webplayer** is het enige gat. Zijn nginx luistert tot en met 2.7 alleen op IPv4,
-  dus op een dual-stack cluster heeft zijn Service dit nodig:
+- **De webplayer** luistert dual-stack vanaf image 2.8, en dat is wat de chart pint. Pin
+  je een oudere, dan is zijn nginx weer IPv4-only: op een dual-stack cluster heeft zijn
+  Service dan dit nodig:
 
   ```yaml
   website:
@@ -233,10 +235,10 @@ en een dual-stack cluster:
       ipFamilies: [IPv4]
   ```
 
-  en op een IPv6-only cluster is hij helemaal niet te bereiken tot je een nieuwer image
-  draait, dat op beide luistert. De API heeft er geen last van. Zijn readiness-probe loopt
-  over `127.0.0.1` binnen de container, dus de pod meldt Ready ook waar zijn Service dood
-  is — kijk naar de Service en niet naar de pod als de player niet laadt.
+  en op een IPv6-only cluster is hij dan helemaal niet te bereiken. De API heeft er geen
+  last van. Zijn readiness-probe loopt over `127.0.0.1` binnen de container, dus met zo'n
+  pin meldt de pod Ready ook waar zijn Service dood is — kijk naar de Service en niet naar
+  de pod als de player niet laadt.
 
 ## Netwerkbeleid en podbeveiliging
 

@@ -271,6 +271,9 @@ website:
   image:
     repository: ghcr.io/ister-app/player
     # Versioned independently of the server — see the note on server.image.tag.
+    # 2.8.0 is a floor worth knowing about, not just a routine bump: from it the image's
+    # nginx listens dual-stack and sets the COOP/COEP headers itself, so an IPv6-only
+    # cluster reaches the player and no Service pin or route filter is needed for it.
     tag: "2.8.0"
     digest: ""
     pullPolicy: IfNotPresent
@@ -288,9 +291,10 @@ website:
     loadBalancerIP: ""
     loadBalancerClass: ""
     externalTrafficPolicy: ""
-    # Player images before 2.8 listen on IPv4 only: on an IPv6-primary cluster set
-    # ipFamilyPolicy: SingleStack and ipFamilies: [IPv4], or the Service gets an
-    # IPv6-only ClusterIP and the ingress answers 503 while the pod is fine.
+    # From player 2.8 the image listens dual-stack, so no pin is needed on any cluster.
+    # Only if you pin an OLDER player on an IPv6-primary cluster does this Service need
+    # ipFamilyPolicy: SingleStack and ipFamilies: [IPv4] — such an image listens on IPv4
+    # only, and the ingress answers 503 while the pod looks fine.
     ipFamilyPolicy: ""
     ipFamilies: []
   # Serve /.well-known/ister (the client discovery document: instance name, OIDC issuer,
@@ -398,9 +402,10 @@ gateway:
     request: 0s
     backendRequest: ""
   # Extra HTTPRoute filters per rule — the Gateway API's equivalent of
-  # ingress.annotations, which the Ingress path already has. The common case is the
-  # cross-origin isolation headers a player older than 2.8 needs for the skwasm
-  # renderer, which nothing else can add:
+  # ingress.annotations, which the Ingress path already has. From player 2.8 the image
+  # sets the cross-origin isolation headers itself (website.extraEnv:
+  # CROSS_ORIGIN_ISOLATION=off turns them off), so this is for your own headers, or for
+  # putting them back when you pin an older player:
   #
   # websiteFilters:
   #   - type: ResponseHeaderModifier

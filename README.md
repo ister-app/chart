@@ -209,16 +209,15 @@ helm template ister . -f values-production.yaml | kubectl apply --dry-run=server
   |---|---|---|---|
   | server, PostgreSQL, RabbitMQ | works | works | works |
   | Typesense | works | works | works |
-  | website (player ≤ 2.7) | works | needs `website.service.ipFamilies: [IPv4]` | **unreachable** |
+  | website | works | works | works |
+  | website, player pinned ≤ 2.7 | works | needs `website.service.ipFamilies: [IPv4]` | unreachable |
 
-  Typesense listens dual-stack because `typesense.apiAddress` defaults to `::`; set it
-  back to `0.0.0.0` only if your nodes run with IPv6 disabled in the kernel. The server,
-  PostgreSQL and RabbitMQ's AMQP listener already bind `::` on their own — RabbitMQ's
-  management, Prometheus and Erlang-distribution listeners do not, but nothing here uses
-  them across the network. The player's nginx is the one gap, and it is fixed in the
-  image itself after 2.7: until that release, an IPv6-only cluster has a working API and
-  an unreachable web player. Note that its readiness probe runs over `127.0.0.1` inside
-  the container, so on such a cluster the pod reports Ready while its Service is dead.
+  Everything the chart deploys at its default versions listens dual-stack. Typesense does
+  so because `typesense.apiAddress` defaults to `::`; set it back to `0.0.0.0` only if
+  your nodes run with IPv6 disabled in the kernel. The server, PostgreSQL, RabbitMQ's
+  AMQP listener and the player's nginx (from 2.8) bind `::` by themselves. RabbitMQ's
+  management, Prometheus and Erlang-distribution listeners do not, but nothing here
+  reaches them across the network.
 
 ## Develop
 
