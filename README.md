@@ -199,13 +199,26 @@ helm template ister . -f values-production.yaml | kubectl apply --dry-run=server
   `gateway.websiteFilters` are the Gateway API's escape hatch, the counterpart of
   `ingress.annotations` — a player older than 2.8 needs the cross-origin isolation
   headers set there for the skwasm renderer.
-- **On an IPv6-primary cluster**, watch the two components that listen on IPv4 only.
-  A Service without `ipFamilies` gets an IPv6 ClusterIP they never answer on, and — a
+- **Address families.** Two things go wrong when a container listens on IPv4 only: a
+  Service without `ipFamilies` gets an IPv6 ClusterIP it never answers on, and — a
   separate problem with the same cause — kubelet aims an `httpGet` probe at the pod's
-  *first* IP, which is the IPv6 one. Typesense is fixed by `typesense.apiAddress: "::"`,
-  which settles both at once; the player's nginx is probed over `127.0.0.1` inside the
-  container, so only its Service needs `website.service.ipFamilies: [IPv4]` until the
-  image listens dual-stack.
+  *first* IP, which on an IPv6-primary cluster is the IPv6 one. Measured on kind with
+  `ipFamily: ipv4`, kind with `ipFamily: ipv6` and a dual-stack cluster:
+
+  | | IPv4-only | dual-stack, IPv6-primary | IPv6-only |
+  |---|---|---|---|
+  | server, PostgreSQL, RabbitMQ | works | works | works |
+  | Typesense | works | works | works |
+  | website (player ≤ 2.7) | works | needs `website.service.ipFamilies: [IPv4]` | **unreachable** |
+
+  Typesense listens dual-stack because `typesense.apiAddress` defaults to `::`; set it
+  back to `0.0.0.0` only if your nodes run with IPv6 disabled in the kernel. The server,
+  PostgreSQL and RabbitMQ's AMQP listener already bind `::` on their own — RabbitMQ's
+  management, Prometheus and Erlang-distribution listeners do not, but nothing here uses
+  them across the network. The player's nginx is the one gap, and it is fixed in the
+  image itself after 2.7: until that release, an IPv6-only cluster has a working API and
+  an unreachable web player. Note that its readiness probe runs over `127.0.0.1` inside
+  the container, so on such a cluster the pod reports Ready while its Service is dead.
 
 ## Develop
 

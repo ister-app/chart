@@ -591,11 +591,15 @@ typesense:
     pullPolicy: IfNotPresent
   port: 8108
   collection: media
-  # Address the API listens on; empty = the image default (0.0.0.0, IPv4 only).
-  # Set "::" on an IPv6-primary cluster: the Service then needs no ipFamilies pin and
-  # the probes below reach the pod on its first IP. Leave it empty where the container
-  # has no IPv6 at all, or the bind fails.
-  apiAddress: ""
+  # Address the API listens on. "::" listens dual-stack, which is the only setting that
+  # works on all three cluster families: the image's own default (0.0.0.0) is IPv4-only,
+  # so on an IPv6-primary cluster Typesense answers on neither the address its Service
+  # hands out nor the one kubelet probes, and on an IPv6-only cluster it is unreachable
+  # altogether. Measured on kind ipv4, kind ipv6 and a dual-stack cluster: "::" answers
+  # on the pod IP in all three (IPv4 arrives v4-mapped).
+  # Set "0.0.0.0" if your nodes run with IPv6 disabled in the kernel, where binding ::
+  # fails outright.
+  apiAddress: "::"
   # httpGet probes, which kubelet aims at the pod's first IP -- see apiAddress. The
   # image ships no curl, wget or nc, so there is no exec probe to fall back on; turn
   # them off if you cannot make Typesense listen on the right family.
@@ -630,9 +634,9 @@ typesense:
       memory: 1Gi
   service:
     annotations: {}
-    # Typesense listens on IPv4 only unless typesense.apiAddress says otherwise: on an
-    # IPv6-primary cluster either set that to "::" (preferred, it fixes the probes too)
-    # or pin this Service with ipFamilyPolicy: SingleStack and ipFamilies: [IPv4].
+    # With the default typesense.apiAddress ("::") no pin is needed on any cluster.
+    # Only if you set apiAddress back to 0.0.0.0 on an IPv6-primary cluster does this
+    # Service need ipFamilyPolicy: SingleStack and ipFamilies: [IPv4].
     ipFamilyPolicy: ""
     ipFamilies: []
 

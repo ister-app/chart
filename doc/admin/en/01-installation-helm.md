@@ -184,6 +184,52 @@ which the device cgroup only allows for a privileged container (`hwaccel.privile
 Add the node's `video`/`render` group ids to `hwaccel.supplementalGroups` when the device
 is group-owned.
 
+## Address families: dual-stack and IPv6-only clusters
+
+The chart runs on an IPv4-only, a dual-stack or an IPv6-only cluster, with one caveat
+that is the image's and not the chart's. Two separate things go wrong when a container
+listens on IPv4 only, and it is worth keeping them apart:
+
+1. **Its Service.** Without an explicit `ipFamilies`, a Service on an IPv6-primary
+   cluster gets an IPv6 ClusterIP, and the container never answers there. That reads as
+   a crashed application; it is a networking choice.
+2. **Its probes.** kubelet aims an `httpGet` probe at the pod's *first* IP, which on such
+   a cluster is the IPv6 one. The probe then fails against a pod that serves its Service
+   perfectly well, and a liveness probe restarts it forever.
+
+Where each component stands, measured on kind with `ipFamily: ipv4`, kind with
+`ipFamily: ipv6`, and a dual-stack cluster:
+
+| Component | IPv4-only | dual-stack, IPv6-primary | IPv6-only |
+|---|---|---|---|
+| server | works | works | works |
+| PostgreSQL (internal) | works | works | works |
+| RabbitMQ (AMQP) | works | works | works |
+| Typesense | works | works | works |
+| website (player ≤ 2.7) | works | needs a Service pin | **unreachable** |
+
+- **Typesense** listens dual-stack because `typesense.apiAddress` defaults to `::`. The
+  image's own default is `0.0.0.0`, which fails both ways above. Set it back to
+  `0.0.0.0` only on nodes that run with IPv6 disabled in the kernel.
+- **The server, PostgreSQL and RabbitMQ's AMQP listener** bind `::` by themselves.
+  RabbitMQ's management, Prometheus and Erlang-distribution listeners are IPv4-only, but
+  nothing in this chart reaches them across the network: `rabbitmq-diagnostics` talks to
+  the local node, and 127.0.0.1 exists in a pod on any cluster.
+- **The web player** is the one gap. Its nginx listens on IPv4 only up to and including
+  2.7, so on a dual-stack cluster its Service needs
+
+  ```yaml
+  website:
+    service:
+      ipFamilyPolicy: SingleStack
+      ipFamilies: [IPv4]
+  ```
+
+  and on an IPv6-only cluster it cannot be reached at all until you run a newer image,
+  which listens on both. The API is unaffected either way. Its readiness probe runs over
+  `127.0.0.1` inside the container, so the pod reports Ready even where its Service is
+  dead — check the Service, not the pod, if the player does not load.
+
 ## Network policies and pod security
 
 `networkPolicy.enabled: true` renders ingress-only NetworkPolicies: the datastores accept

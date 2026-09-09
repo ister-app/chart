@@ -192,6 +192,52 @@ devicebestand van de node, wat de device-cgroup alleen toestaat voor een privile
 container (`hwaccel.privileged`). Zet de group-id's van `video`/`render` van de node in
 `hwaccel.supplementalGroups` als het device group-eigendom is.
 
+## Adresfamilies: dual-stack en IPv6-only clusters
+
+De chart draait op een IPv4-only, een dual-stack of een IPv6-only cluster, met één
+kanttekening die van het image is en niet van de chart. Er gaan twee losse dingen mis als
+een container alleen op IPv4 luistert, en die zijn de moeite waard uit elkaar te houden:
+
+1. **Zijn Service.** Zonder expliciete `ipFamilies` krijgt een Service op een
+   IPv6-primair cluster een IPv6-ClusterIP, en daar antwoordt de container nooit. Dat
+   leest als een gecrashte applicatie, maar het is een netwerkkeuze.
+2. **Zijn probes.** kubelet richt een `httpGet`-probe op het *eerste* pod-IP, en dat is op
+   zo'n cluster het IPv6-adres. De probe faalt dan tegen een pod die zijn Service prima
+   bedient, en een liveness-probe herstart hem eindeloos.
+
+Waar elk onderdeel staat, gemeten op kind met `ipFamily: ipv4`, kind met `ipFamily: ipv6`
+en een dual-stack cluster:
+
+| Component | IPv4-only | dual-stack, IPv6-primair | IPv6-only |
+|---|---|---|---|
+| server | werkt | werkt | werkt |
+| PostgreSQL (internal) | werkt | werkt | werkt |
+| RabbitMQ (AMQP) | werkt | werkt | werkt |
+| Typesense | werkt | werkt | werkt |
+| website (player ≤ 2.7) | werkt | Service-pin nodig | **onbereikbaar** |
+
+- **Typesense** luistert dual-stack doordat `typesense.apiAddress` standaard `::` is. De
+  eigen standaard van het image is `0.0.0.0`, en die faalt op beide manieren hierboven.
+  Zet hem alleen terug op `0.0.0.0` op nodes waar IPv6 in de kernel uit staat.
+- **De server, PostgreSQL en de AMQP-listener van RabbitMQ** binden uit zichzelf al `::`.
+  De management-, Prometheus- en Erlang-distributielisteners van RabbitMQ zijn IPv4-only,
+  maar niets in deze chart benadert die over het netwerk: `rabbitmq-diagnostics` praat met
+  de lokale node, en 127.0.0.1 bestaat in een pod op elk cluster.
+- **De webplayer** is het enige gat. Zijn nginx luistert tot en met 2.7 alleen op IPv4,
+  dus op een dual-stack cluster heeft zijn Service dit nodig:
+
+  ```yaml
+  website:
+    service:
+      ipFamilyPolicy: SingleStack
+      ipFamilies: [IPv4]
+  ```
+
+  en op een IPv6-only cluster is hij helemaal niet te bereiken tot je een nieuwer image
+  draait, dat op beide luistert. De API heeft er geen last van. Zijn readiness-probe loopt
+  over `127.0.0.1` binnen de container, dus de pod meldt Ready ook waar zijn Service dood
+  is — kijk naar de Service en niet naar de pod als de player niet laadt.
+
 ## Netwerkbeleid en podbeveiliging
 
 `networkPolicy.enabled: true` rendert NetworkPolicies voor alleen inkomend verkeer: de
