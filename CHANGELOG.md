@@ -1,5 +1,46 @@
 # Changelog
 
+## ister-chart v1.1.0
+
+| Component | Image | Version |
+|---|---|---|
+| server | `ghcr.io/ister-app/server` | 3.5.1 |
+| website | `ghcr.io/ister-app/player` | 2.8.0 |
+| migrations | `ghcr.io/ister-app/migrations` | 3.5.1 |
+| database | `postgres` | 18.6 |
+| typesense | `docker.io/typesense/typesense` | 30.2 |
+| rabbitmq | `rabbitmq` | 4.3.5-management-alpine |
+
+### Features
+
+- feat(typesense): listen dual-stack by default, so an IPv6-only cluster works ([`3ea8c1e`](https://github.com/ister-app/chart/commit/3ea8c1e))
+- feat: values for three things the chart could not express ([`a378274`](https://github.com/ister-app/chart/commit/a378274))
+
+### Fixes
+
+- fix(secrets): no TMDB key needed when tmdbApiUrl points elsewhere ([`3bd44f3`](https://github.com/ister-app/chart/commit/3bd44f3))
+- fix(hwaccel): privileged rendered a securityContext the API server rejects ([`c75bdf8`](https://github.com/ister-app/chart/commit/c75bdf8))
+- fix(website): probe nginx over 127.0.0.1, not over the pod IP ([`6251769`](https://github.com/ister-app/chart/commit/6251769))
+
+### Dependency updates
+
+- fix(deps): player 2.8.0, which closes the last IPv6-only gap ([`be428e5`](https://github.com/ister-app/chart/commit/be428e5))
+- fix(deps): pin postgres to 18.6 instead of the floating major tag ([`37a45ba`](https://github.com/ister-app/chart/commit/37a45ba))
+- fix(deps): mock-oauth2-server 6.0.2 and python 3.14-alpine (CI only) ([`09c5434`](https://github.com/ister-app/chart/commit/09c5434))
+- fix(deps): rabbitmq 4.2.5 -> 4.3.5-management-alpine, curl 8.21.0 -> 8.22.0 ([`4220f55`](https://github.com/ister-app/chart/commit/4220f55))
+
+### Other
+
+- docs: identity provider chapter, the GitOps caveat and the demo recipe ([`b7c414f`](https://github.com/ister-app/chart/commit/b7c414f))
+
+### Install
+
+```sh
+helm install ister oci://ghcr.io/ister-app/charts/ister --version 1.1.0
+```
+
+**Full changelog**: https://github.com/ister-app/chart/compare/v1.0.1...v1.1.0
+
 ## ister-chart v1.0.1
 
 | Component | Image | Version |
