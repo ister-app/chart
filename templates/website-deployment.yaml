@@ -66,15 +66,19 @@ spec:
               readOnly: true
           {{- end }}
           {{- if .Values.website.probes.enabled }}
+          {{- $probe := list "curl" "-fsS" "-o" "/dev/null" (printf "http://127.0.0.1:%d%s" (int .Values.website.port) .Values.website.probes.path) }}
+          # exec and not httpGet, for the same reason the database and broker probes are
+          # exec: kubelet aims an httpGet at the pod's FIRST IP, which on an
+          # IPv6-primary cluster is the IPv6 one, and the player image's nginx listens
+          # on IPv4 only. That restarted a healthy pod in a loop while its Service
+          # answered fine. 127.0.0.1 inside the container is right either way.
           readinessProbe:
-            httpGet:
-              path: {{ .Values.website.probes.path }}
-              port: http
+            exec:
+              command: {{ toJson $probe }}
             periodSeconds: 10
           livenessProbe:
-            httpGet:
-              path: {{ .Values.website.probes.path }}
-              port: http
+            exec:
+              command: {{ toJson $probe }}
             periodSeconds: 20
           {{- end }}
           resources:
