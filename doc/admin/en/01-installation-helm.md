@@ -159,9 +159,9 @@ behind any controller, a NodePort or a port-forward. The older ingress-nginx sni
 
 The Services accept the usual knobs (`server.service`, `website.service`,
 `typesense.service`: `type`, `nodePort`, `annotations`, `loadBalancerIP`, `ipFamilies`,
-...). On an IPv6-primary cluster, give the website and Typesense Services
-`ipFamilyPolicy: SingleStack` / `ipFamilies: [IPv4]` unless the player image is 2.8 or
-newer: older images listen on IPv4 only, and an IPv6-only ClusterIP then answers 503.
+...). Everything the chart deploys listens dual-stack, so no `ipFamilies` pin is needed
+on any cluster — see [Address families](#address-families-dual-stack-and-ipv6-only-clusters)
+for what to do if you pin an image of your own that does not.
 
 ## Helper nodes and hardware encoding
 
@@ -186,9 +186,10 @@ is group-owned.
 
 ## Address families: dual-stack and IPv6-only clusters
 
-The chart runs on an IPv4-only, a dual-stack or an IPv6-only cluster, with one caveat
-that is the image's and not the chart's. Two separate things go wrong when a container
-listens on IPv4 only, and it is worth keeping them apart:
+The chart runs on an IPv4-only, a dual-stack or an IPv6-only cluster as it stands. It is
+still worth knowing what goes wrong when a container listens on IPv4 only, because it
+bites the moment you swap an image for one of your own — and because the two ways it
+bites look nothing alike:
 
 1. **Its Service.** Without an explicit `ipFamilies`, a Service on an IPv6-primary
    cluster gets an IPv6 ClusterIP, and the container never answers there. That reads as
@@ -207,7 +208,6 @@ Where each component stands, measured on kind with `ipFamily: ipv4`, kind with
 | RabbitMQ (AMQP) | works | works | works |
 | Typesense | works | works | works |
 | website | works | works | works |
-| website, player pinned ≤ 2.7 | works | needs a Service pin | unreachable |
 
 - **Typesense** listens dual-stack because `typesense.apiAddress` defaults to `::`. The
   image's own default is `0.0.0.0`, which fails both ways above. Set it back to
@@ -216,9 +216,8 @@ Where each component stands, measured on kind with `ipFamily: ipv4`, kind with
   RabbitMQ's management, Prometheus and Erlang-distribution listeners are IPv4-only, but
   nothing in this chart reaches them across the network: `rabbitmq-diagnostics` talks to
   the local node, and 127.0.0.1 exists in a pod on any cluster.
-- **The web player** listens dual-stack from image 2.8, which is what the chart pins.
-  Pin an older one and its nginx is IPv4-only again: on a dual-stack cluster its Service
-  then needs
+- **The web player's nginx** listens dual-stack in the image the chart pins. If you
+  point `website.image` at one of your own that binds IPv4 only, its Service needs
 
   ```yaml
   website:
@@ -227,10 +226,10 @@ Where each component stands, measured on kind with `ipFamily: ipv4`, kind with
       ipFamilies: [IPv4]
   ```
 
-  and on an IPv6-only cluster it cannot be reached at all. The API is unaffected either
-  way. Its readiness probe runs over `127.0.0.1` inside the container, so with such a pin
-  the pod reports Ready even where its Service is dead — check the Service, not the pod,
-  if the player does not load.
+  on a dual-stack cluster, and on an IPv6-only cluster it cannot be reached at all. The
+  API is unaffected either way. Its readiness probe runs over `127.0.0.1` inside the
+  container, so such an image reports Ready even where its Service is dead — check the
+  Service, not the pod, if the player does not load.
 
 ## Network policies and pod security
 

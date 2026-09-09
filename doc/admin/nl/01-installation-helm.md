@@ -167,9 +167,9 @@ voor opstellingen die erop leunen.
 
 De Services kennen de gebruikelijke knoppen (`server.service`, `website.service`,
 `typesense.service`: `type`, `nodePort`, `annotations`, `loadBalancerIP`, `ipFamilies`,
-...). Geef op een IPv6-first cluster de website- en Typesense-Services
-`ipFamilyPolicy: SingleStack` / `ipFamilies: [IPv4]` tenzij de player-image 2.8 of nieuwer
-is: oudere images luisteren alleen op IPv4, en een IPv6-only ClusterIP antwoordt dan 503.
+...). Alles wat de chart uitrolt luistert dual-stack, dus een `ipFamilies`-pin is op geen
+enkel cluster nodig — zie [Adresfamilies](#adresfamilies-dual-stack-en-ipv6-only-clusters)
+voor wat je doet als je zelf een image pint dat dat niet doet.
 
 ## Helper-nodes en hardware-encoding
 
@@ -194,9 +194,10 @@ container (`hwaccel.privileged`). Zet de group-id's van `video`/`render` van de 
 
 ## Adresfamilies: dual-stack en IPv6-only clusters
 
-De chart draait op een IPv4-only, een dual-stack of een IPv6-only cluster, met één
-kanttekening die van het image is en niet van de chart. Er gaan twee losse dingen mis als
-een container alleen op IPv4 luistert, en die zijn de moeite waard uit elkaar te houden:
+De chart draait zoals hij is op een IPv4-only, een dual-stack of een IPv6-only cluster.
+Het blijft de moeite waard te weten wat er misgaat als een container alleen op IPv4
+luistert, want dat bijt zodra je een image voor een eigen exemplaar inwisselt — en de
+twee manieren waarop het bijt lijken in niets op elkaar:
 
 1. **Zijn Service.** Zonder expliciete `ipFamilies` krijgt een Service op een
    IPv6-primair cluster een IPv6-ClusterIP, en daar antwoordt de container nooit. Dat
@@ -215,7 +216,6 @@ en een dual-stack cluster:
 | RabbitMQ (AMQP) | werkt | werkt | werkt |
 | Typesense | werkt | werkt | werkt |
 | website | werkt | werkt | werkt |
-| website, player gepind op ≤ 2.7 | werkt | Service-pin nodig | onbereikbaar |
 
 - **Typesense** luistert dual-stack doordat `typesense.apiAddress` standaard `::` is. De
   eigen standaard van het image is `0.0.0.0`, en die faalt op beide manieren hierboven.
@@ -224,9 +224,9 @@ en een dual-stack cluster:
   De management-, Prometheus- en Erlang-distributielisteners van RabbitMQ zijn IPv4-only,
   maar niets in deze chart benadert die over het netwerk: `rabbitmq-diagnostics` praat met
   de lokale node, en 127.0.0.1 bestaat in een pod op elk cluster.
-- **De webplayer** luistert dual-stack vanaf image 2.8, en dat is wat de chart pint. Pin
-  je een oudere, dan is zijn nginx weer IPv4-only: op een dual-stack cluster heeft zijn
-  Service dan dit nodig:
+- **De nginx van de webplayer** luistert dual-stack in het image dat de chart pint. Wijs
+  je `website.image` naar een eigen image dat alleen op IPv4 bindt, dan heeft zijn Service
+  op een dual-stack cluster dit nodig:
 
   ```yaml
   website:
@@ -236,9 +236,9 @@ en een dual-stack cluster:
   ```
 
   en op een IPv6-only cluster is hij dan helemaal niet te bereiken. De API heeft er geen
-  last van. Zijn readiness-probe loopt over `127.0.0.1` binnen de container, dus met zo'n
-  pin meldt de pod Ready ook waar zijn Service dood is — kijk naar de Service en niet naar
-  de pod als de player niet laadt.
+  last van. Zijn readiness-probe loopt over `127.0.0.1` binnen de container, dus zo'n
+  image meldt Ready ook waar zijn Service dood is — kijk naar de Service en niet naar de
+  pod als de player niet laadt.
 
 ## Netwerkbeleid en podbeveiliging
 

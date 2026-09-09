@@ -10,9 +10,12 @@ Installation guide: [ister.app/server/installation-helm](https://ister.app/serve
 Released charts are pushed to ghcr.io as OCI artifacts:
 
 ```sh
-helm install ister oci://ghcr.io/ister-app/charts/ister --version 0.2.0 \
+helm install ister oci://ghcr.io/ister-app/charts/ister \
   -n ister --create-namespace -f values-production.yaml
 ```
+
+That takes the latest release. Releases are daily, so pin `--version` to the one you
+tested with for anything you care about.
 
 From a checkout instead — which is what you want when changing the chart:
 
@@ -197,8 +200,8 @@ helm template ister . -f values-production.yaml | kubectl apply --dry-run=server
   (`gateway.*`). Helper-node uploads and HLS need unbounded bodies and long timeouts;
   the docs chapter lists what each proxy needs. `gateway.apiFilters` and
   `gateway.websiteFilters` are the Gateway API's escape hatch, the counterpart of
-  `ingress.annotations` — a player older than 2.8 needs the cross-origin isolation
-  headers set there for the skwasm renderer.
+  `ingress.annotations`, for response headers and rewrites the chart does not render
+  itself.
 - **Address families.** Two things go wrong when a container listens on IPv4 only: a
   Service without `ipFamilies` gets an IPv6 ClusterIP it never answers on, and — a
   separate problem with the same cause — kubelet aims an `httpGet` probe at the pod's
@@ -210,7 +213,6 @@ helm template ister . -f values-production.yaml | kubectl apply --dry-run=server
   | server, PostgreSQL, RabbitMQ | works | works | works |
   | Typesense | works | works | works |
   | website | works | works | works |
-  | website, player pinned ≤ 2.7 | works | needs `website.service.ipFamilies: [IPv4]` | unreachable |
 
   Everything the chart deploys at its default versions listens dual-stack. Typesense does
   so because `typesense.apiAddress` defaults to `::`; set it back to `0.0.0.0` only if
@@ -252,7 +254,7 @@ the notes from the commits since the previous tag, grouped by conventional-commi
 table of the image versions the release actually deploys. It runs locally too:
 
 ```sh
-ci/release-notes.sh 0.3.0 v0.2.0 && cat RELEASE_NOTES.md
+ci/release-notes.sh <new-version> <previous-tag> && cat RELEASE_NOTES.md
 ```
 
 ### Versions

@@ -53,9 +53,9 @@ spec:
             value: /
       {{- with .Values.gateway.websiteFilters }}
       # The Ingress path has ingress.annotations as its escape hatch; this is the
-      # Gateway API's. From player 2.8 the image sets the COOP/COEP headers the skwasm
-      # renderer needs by itself; pin an older one and an HTTPRoute filter is the only
-      # place left to add them.
+      # Gateway API's. The player image sets the COOP/COEP headers the skwasm renderer
+      # needs by itself; an image that does not leaves an HTTPRoute filter as the only
+      # place to add them.
       filters:
         {{- toYaml . | nindent 8 }}
       {{- end }}

@@ -16,7 +16,7 @@ helm lint . -f values-dev.yaml --set server.tmdbApiKey=x
 helm template ister . -f ci/values-ci.yaml             # values.schema.json is enforced on every render
 helm package .
 
-ci/release-notes.sh 0.3.0 v0.2.0 && cat RELEASE_NOTES.md   # release notes, runs locally
+ci/release-notes.sh <new-version> <previous-tag> && cat RELEASE_NOTES.md   # runs locally
 ci/build-docs.sh 0.0.0-local                               # the docs zip, runs locally
 ```
 
@@ -74,6 +74,14 @@ branches on `database.mode`. Preserve that when touching `templates/secrets.yaml
 **Passwords are generated once and preserved** via `lookup` against the live cluster
 (`templates/secrets.yaml`). Without it every `helm upgrade` would mint a new password and lock the
 app out of its own database. This is why `helm template` and `helm install` can disagree.
+
+**That preservation does not survive GitOps**, and it is the single most expensive thing to
+rediscover here. Argo CD, Flux and `helm template | kubectl apply` all render without cluster
+access, so `lookup` returns nothing and every sync mints a fresh secret: PostgreSQL keeps the
+first password in its volume and the server then fails with `password authentication failed`,
+and everything else restarts on every commit through the `checksum/secrets` annotation. The
+answer is an explicit value or an `existingSecret`; `NOTES.txt` names which values were
+generated so an operator finds out at install time rather than on the third sync.
 
 **Flyway is an init container on the server pod**, not a Helm hook. A `pre-install` hook cannot
 work: in `internal`/`cnpg` mode the database is created by the same release, so the hook would wait
@@ -141,8 +149,9 @@ Automatic, and the details matter before you touch `Chart.yaml`:
   literal markers out anywhere else in `doc/` (the script fills every pair it finds). `doc/` is
   `.helmignore`d, so it never ends up in the chart tgz; a `doc/**` change does trigger a release.
 
-`server` and `player` publish semver tags: `values.yaml` pins both at `1.0.0` and Renovate bumps
-them from there. `migrations` has no `tag` of its own — see the appVersion note above.
+`server` and `player` publish semver tags and are pinned independently in `values.yaml`;
+Renovate bumps each from there, and neither number belongs in prose that goes stale.
+`migrations` has no `tag` of its own — see the appVersion note above.
 
 ## Conventions
 

@@ -271,16 +271,16 @@ website:
   image:
     repository: ghcr.io/ister-app/player
     # Versioned independently of the server — see the note on server.image.tag.
-    # 2.8.0 is a floor worth knowing about, not just a routine bump: from it the image's
-    # nginx listens dual-stack and sets the COOP/COEP headers itself, so an IPv6-only
-    # cluster reaches the player and no Service pin or route filter is needed for it.
+    # The image's nginx listens dual-stack and sets the COOP/COEP headers itself, so
+    # the player needs no Service pin and no route filter on any cluster. Point this at
+    # an image of your own and check both before you do.
     tag: "2.8.0"
     digest: ""
     pullPolicy: IfNotPresent
   replicaCount: 1
   port: 8080
   # Extra env vars for the nginx that serves the player. CROSS_ORIGIN_ISOLATION=off
-  # disables the COOP/COEP headers (player >= 2.8) if the app is embedded cross-origin.
+  # disables the COOP/COEP headers if the app is embedded cross-origin.
   extraEnv: []
   service:
     type: ClusterIP
@@ -291,10 +291,10 @@ website:
     loadBalancerIP: ""
     loadBalancerClass: ""
     externalTrafficPolicy: ""
-    # From player 2.8 the image listens dual-stack, so no pin is needed on any cluster.
-    # Only if you pin an OLDER player on an IPv6-primary cluster does this Service need
-    # ipFamilyPolicy: SingleStack and ipFamilies: [IPv4] — such an image listens on IPv4
-    # only, and the ingress answers 503 while the pod looks fine.
+    # The pinned image listens dual-stack, so no pin is needed on any cluster. Only an
+    # image that binds IPv4 only needs ipFamilyPolicy: SingleStack and
+    # ipFamilies: [IPv4] here on an IPv6-primary cluster — without it the ingress
+    # answers 503 while the pod looks fine.
     ipFamilyPolicy: ""
     ipFamilies: []
   # Serve /.well-known/ister (the client discovery document: instance name, OIDC issuer,
@@ -402,10 +402,9 @@ gateway:
     request: 0s
     backendRequest: ""
   # Extra HTTPRoute filters per rule — the Gateway API's equivalent of
-  # ingress.annotations, which the Ingress path already has. From player 2.8 the image
-  # sets the cross-origin isolation headers itself (website.extraEnv:
-  # CROSS_ORIGIN_ISOLATION=off turns them off), so this is for your own headers, or for
-  # putting them back when you pin an older player:
+  # ingress.annotations, which the Ingress path already has. The player image sets the
+  # cross-origin isolation headers itself (website.extraEnv: CROSS_ORIGIN_ISOLATION=off
+  # turns them off), so this is for headers and rewrites of your own:
   #
   # websiteFilters:
   #   - type: ResponseHeaderModifier
