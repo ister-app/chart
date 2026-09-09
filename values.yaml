@@ -518,7 +518,7 @@ rabbitmq:
   enabled: true
   image:
     repository: rabbitmq
-    tag: "4.2.5-management-alpine"
+    tag: "4.3.5-management-alpine"
     digest: ""
     pullPolicy: IfNotPresent
   auth:
@@ -709,5 +709,5 @@ podDisruptionBudget:
 tests:
   image:
     repository: curlimages/curl
-    tag: "8.21.0"
+    tag: "8.22.0"
     pullPolicy: IfNotPresent
