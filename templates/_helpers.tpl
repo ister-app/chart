@@ -414,6 +414,13 @@ Hardware acceleration, from a {type, device, resources, hostPath, privileged, su
 {{- if and .hwaccel.privileged .hwaccel.type (ne .hwaccel.type "none") -}}
 {{- $_ := set $sc "privileged" true -}}
 {{- $_ := unset $sc "capabilities" -}}
+{{/*
+The API server rejects privileged together with allowPrivilegeEscalation: false
+("cannot set `allowPrivilegeEscalation` to false and `privileged` to true"), and the
+base securityContext sets exactly that. Without this the render is valid YAML that
+kubectl refuses to apply.
+*/}}
+{{- $_ := set $sc "allowPrivilegeEscalation" true -}}
 {{- end -}}
 {{- toYaml $sc -}}
 {{- end }}
