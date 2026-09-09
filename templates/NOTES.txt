@@ -53,3 +53,27 @@ NOTE: without ingress, gateway or server.url the advertised API URL is
 NOTE: database.mode=internal is one PostgreSQL pod, no backups, no failover. Use
 mode=cnpg (CloudNativePG operator) or mode=external for anything you care about.
 {{- end }}
+{{- $generated := list }}
+{{- if and (eq .Values.database.mode "internal") (not .Values.database.internal.existingSecret) (not .Values.database.internal.password) }}
+{{- $generated = append $generated "database.internal.password" }}
+{{- end }}
+{{- if and .Values.rabbitmq.enabled (not .Values.rabbitmq.auth.existingSecret) (not .Values.rabbitmq.auth.password) }}
+{{- $generated = append $generated "rabbitmq.auth.password" }}
+{{- end }}
+{{- if and .Values.typesense.enabled (not .Values.typesense.existingSecret) (not .Values.typesense.apiKey) }}
+{{- $generated = append $generated "typesense.apiKey" }}
+{{- end }}
+{{- if $generated }}
+
+NOTE: these passwords were generated for you: {{ join ", " $generated }}. They are kept
+across upgrades by looking the existing Secret up in the cluster.
+
+  If you deploy through Argo CD, Flux or "helm template | kubectl apply", that lookup
+  returns nothing -- those render without cluster access -- and EVERY sync mints a new
+  password. PostgreSQL keeps the first one in its volume and the server then fails with
+  "password authentication failed"; everything else restarts on every commit, because
+  the changed Secret changes the checksum/secrets pod annotation.
+
+  Set the values above explicitly, or point the matching existingSecret at a Secret you
+  manage (sealed-secrets, External Secrets, SOPS).
+{{- end }}

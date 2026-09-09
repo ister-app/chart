@@ -26,7 +26,9 @@ mediavolumes — genoeg om het te proberen, geen productie-opstelling.
 
 - Een Kubernetes-cluster en Helm 3.
 - Een [TMDB API-key](https://www.themoviedb.org/settings/api) voor film-/seriemetadata.
-- Een OIDC-issuer (bijvoorbeeld Keycloak) — ister beheert zelf geen gebruikers.
+- Een OIDC-issuer (bijvoorbeeld Keycloak) — ister beheert zelf geen gebruikers. Die moet
+  op een bepaalde manier ingericht zijn; zie
+  [De identity provider instellen](02-identity-provider.md).
 - Voor `database.mode: cnpg`: de [CloudNativePG](https://cloudnative-pg.io/)-operator.
 - Voor ingress met TLS: een ingress-controller en optioneel cert-manager.
 
@@ -96,6 +98,13 @@ diens `existingSecret` heeft de sleutel `api-key` nodig.
   waarde — anders zou elke `helm upgrade` de server buiten zijn eigen database sluiten.
   Daarom verschilt de uitvoer van `helm template` ook van wat `helm install`
   daadwerkelijk toepast.
+- **...maar niet onder GitOps.** Argo CD, Flux en `helm template | kubectl apply`
+  renderen zonder toegang tot het cluster, dus die lookup vindt niets en elke sync
+  genereert een nieuw wachtwoord. PostgreSQL houdt het eerste in zijn volume en de server
+  strandt daarna op `password authentication failed`; al het andere herstart bij elke
+  commit via de `checksum/secrets`-annotatie. Zo uitrollen betekent
+  `database.internal.password`, `rabbitmq.auth.password` en `typesense.apiKey` expliciet
+  zetten, of het bijbehorende `existingSecret` naar een Secret in eigen beheer wijzen.
 - **Een Secret roteren herstart de server.** Alle credentials worden gehasht in een
   `checksum/secrets`-podannotatie, dus een gewijzigd Secret rolt de Deployment.
 

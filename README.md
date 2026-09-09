@@ -67,6 +67,16 @@ at them:
 Passwords left empty are generated on install and preserved across upgrades (via
 `lookup`). Passing them with `--set` instead puts them in your shell history.
 
+**That generation does not survive GitOps.** Argo CD, Flux and `helm template |
+kubectl apply` all render without access to the cluster, so `lookup` returns nothing and
+every single sync mints a fresh password. PostgreSQL keeps the first one in its volume
+and the server then fails with `password authentication failed for user "ister"`;
+everything else restarts on every commit, because the changed Secret changes the
+`checksum/secrets` pod annotation. Under GitOps, set `database.internal.password`,
+`rabbitmq.auth.password` and `typesense.apiKey` explicitly, or point the matching
+`existingSecret` at a Secret you manage (sealed-secrets, External Secrets, SOPS). The
+install notes say which ones were generated.
+
 Every credential the server reads is hashed into a `checksum/secrets` pod annotation, so
 rotating a Secret actually restarts the pod.
 
@@ -89,8 +99,49 @@ server:
       hostPath: /srv/media/shows     # or: existingClaim, or: nfs
 ```
 
+One source can carry several libraries: add `subPath` to pick a directory out of it.
+Without it every entry mounts the whole tree and every library scans all of it, so a
+single PVC or NFS export would otherwise force one volume per library.
+
+```yaml
+  mediaVolumes:
+    - {name: shows,  library: shows,  mountPath: /mnt/shows,  existingClaim: media, subPath: shows}
+    - {name: movies, library: movies, mountPath: /mnt/movies, existingClaim: media, subPath: movies}
+```
+
 A `hostPath` entry pins the server to whichever node holds that path — set
 `server.nodeSelector` to match, or use `existingClaim`/`nfs` to keep it schedulable.
+
+## Running a public demo
+
+The three CI-only pods in `ci/` are useful outside CI as well: together they make an
+instance anyone can click around in, without media, an internet connection or a TMDB key.
+None of them is part of the chart — copy them into your namespace and adjust the
+namespace and hostnames.
+
+- `ci/mock-external.yaml` serves TMDB, MusicBrainz, Cover Art Archive, Open Library,
+  Wikidata/Wikipedia, Commons and iTunes from one WireMock. Its stubs are **fixture-aware**:
+  every movie, show and book in `ister-app/testdata` has its own search and detail pair, so
+  a demo shows real-looking titles, plots and posters instead of bare file names. Point
+  `server.externalServices.*` at it, as `ci/values-ci.yaml` does.
+- `ci/podcast-feed.yaml` serves the generated RSS feed so the `PODCAST` library has
+  something to subscribe to.
+- `ci/mock-oidc.yaml` is an issuer for a throwaway environment. For anything a real user
+  logs into, run a real one — see the identity provider chapter in `doc/`.
+
+The media itself comes from [`ister-app/testdata`](https://github.com/ister-app/testdata):
+that repo holds only images and `.nfo` files, and its `create_*.sh` scripts generate the
+mkv, flac, epub, cbz and mp3 files with ffmpeg. In a cluster, run them in a one-shot Job
+that writes straight into the PVCs your `mediaVolumes` point at (an `alpine` image plus
+`apk add bash ffmpeg zip python3 git` is enough; budget 10-20 minutes). Because
+`mediaVolumes` takes a `subPath`, one claim can hold every library.
+
+Two things worth knowing before you leave such an instance running: pin the generated
+passwords (see Secrets above) if you deploy it with GitOps, and remember the demo
+accumulates whatever visitors do to it. Resetting nightly is a matter of scaling the
+server to zero, dropping and recreating the database, deleting the Typesense pod, scaling
+back up and re-running `scanLibraries` — the Flyway init container rebuilds the schema on
+the way up.
 
 ## Migrating from the raw manifests
 
@@ -144,7 +195,17 @@ helm template ister . -f values-production.yaml | kubectl apply --dry-run=server
 - Exposure is either an Ingress (`ingress.*`, with `ingress.controller` rendering the
   body-size/timeout annotations per controller) or a Gateway API HTTPRoute
   (`gateway.*`). Helper-node uploads and HLS need unbounded bodies and long timeouts;
-  the docs chapter lists what each proxy needs.
+  the docs chapter lists what each proxy needs. `gateway.apiFilters` and
+  `gateway.websiteFilters` are the Gateway API's escape hatch, the counterpart of
+  `ingress.annotations` — a player older than 2.8 needs the cross-origin isolation
+  headers set there for the skwasm renderer.
+- **On an IPv6-primary cluster**, watch the two components that listen on IPv4 only.
+  A Service without `ipFamilies` gets an IPv6 ClusterIP they never answer on, and — a
+  separate problem with the same cause — kubelet aims an `httpGet` probe at the pod's
+  *first* IP, which is the IPv6 one. Typesense is fixed by `typesense.apiAddress: "::"`,
+  which settles both at once; the player's nginx is probed over `127.0.0.1` inside the
+  container, so only its Service needs `website.service.ipFamilies: [IPv4]` until the
+  image listens dual-stack.
 
 ## Develop
 

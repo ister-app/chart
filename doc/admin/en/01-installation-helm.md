@@ -26,7 +26,8 @@ to try it out, not a production setup.
 
 - A Kubernetes cluster and Helm 3.
 - A [TMDB API key](https://www.themoviedb.org/settings/api) for movie/show metadata.
-- An OIDC issuer (for example Keycloak) — ister does not manage users itself.
+- An OIDC issuer (for example Keycloak) — ister does not manage users itself. It has to
+  be set up a particular way; see [Setting up the identity provider](02-identity-provider.md).
 - For `database.mode: cnpg`: the [CloudNativePG](https://cloudnative-pg.io/) operator.
 - For ingress with TLS: an ingress controller and, optionally, cert-manager.
 
@@ -92,6 +93,13 @@ leftover PVC afterwards; the server reconnects to the new broker on its own.
   it looks up the live Secret on upgrade and keeps the existing value — otherwise every
   `helm upgrade` would lock the server out of its own database. This is also why
   `helm template` output differs from what `helm install` actually applies.
+- **...but not under GitOps.** Argo CD, Flux and `helm template | kubectl apply` render
+  without access to the cluster, so that lookup finds nothing and every sync generates a
+  new password. PostgreSQL keeps the first one in its volume and the server then fails
+  with `password authentication failed`; everything else restarts on every commit through
+  the `checksum/secrets` annotation. Deploying that way means setting
+  `database.internal.password`, `rabbitmq.auth.password` and `typesense.apiKey`
+  explicitly, or pointing the matching `existingSecret` at a Secret you manage.
 - **Rotating a Secret restarts the server.** All credentials are hashed into a
   `checksum/secrets` pod annotation, so a changed Secret rolls the Deployment.
 
