@@ -24,7 +24,7 @@ spec:
     spec:
       containers:
         - name: http-server
-          image: python:3.13-alpine
+          image: python:3.14-alpine
           command: ["python3", "-m", "http.server", "8080", "--directory", "/feed"]
           ports:
             - name: http
