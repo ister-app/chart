@@ -83,7 +83,7 @@ jobs:
         with:
           # Same major as ci.yml's HELM_VERSION: the chart is linted and e2e-tested with
           # helm 3, so it is packaged with helm 3. A helm 4 bump is a PR, not an automerge.
-          version: v3.21.4
+          version: v3.22.0
 
       - name: Work out the new chart version
         id: version
