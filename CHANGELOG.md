@@ -1,5 +1,32 @@
 # Changelog
 
+## ister-chart v1.1.1
+
+| Component | Image | Version |
+|---|---|---|
+| server | `ghcr.io/ister-app/server` | 3.5.1 |
+| website | `ghcr.io/ister-app/player` | 2.8.0 |
+| migrations | `ghcr.io/ister-app/migrations` | 3.5.1 |
+| database | `postgres` | 18.6 |
+| typesense | `docker.io/typesense/typesense` | 30.2 |
+| rabbitmq | `rabbitmq` | 4.3.5-management-alpine |
+
+### Dependency updates
+
+- chore(deps): update dependency helm to v3.22.0 ([`6a3ac0c`](https://github.com/ister-app/chart/commit/6a3ac0c))
+
+### Other
+
+- docs: describe what the chart does, not which version started doing it ([`d083985`](https://github.com/ister-app/chart/commit/d083985))
+
+### Install
+
+```sh
+helm install ister oci://ghcr.io/ister-app/charts/ister --version 1.1.1
+```
+
+**Full changelog**: https://github.com/ister-app/chart/compare/v1.1.0...v1.1.1
+
 ## ister-chart v1.1.0
 
 | Component | Image | Version |
