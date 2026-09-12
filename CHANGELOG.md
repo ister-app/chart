@@ -1,5 +1,38 @@
 # Changelog
 
+## ister-chart v1.1.2
+
+| Component | Image | Version |
+|---|---|---|
+| server | `ghcr.io/ister-app/server` | 3.5.2 |
+| website | `ghcr.io/ister-app/player` | 2.8.0 |
+| migrations | `ghcr.io/ister-app/migrations` | 3.5.2 |
+| database | `postgres` | 18.6 |
+| typesense | `docker.io/typesense/typesense` | 30.2 |
+| rabbitmq | `rabbitmq` | 4.3.5-management-alpine |
+
+### Fixes
+
+- fix(ci): stop Renovate opening a dependency dashboard on every pass ([`57ca7b3`](https://github.com/ister-app/chart/commit/57ca7b3))
+- fix(ci): wait for the ingress-nginx webhook, not just for the pod ([`e5dae0b`](https://github.com/ister-app/chart/commit/e5dae0b))
+
+### Dependency updates
+
+- chore(deps): update ghcr.io/ister-app/server docker tag to v3.5.2 ([`2a428f0`](https://github.com/ister-app/chart/commit/2a428f0))
+- chore(deps): update renovatebot/github-action action to v46.3.0 ([`40088c3`](https://github.com/ister-app/chart/commit/40088c3))
+
+### Other
+
+- chore(ci): let Renovate track ci.yml's helm pin too ([`e3dbfe6`](https://github.com/ister-app/chart/commit/e3dbfe6))
+
+### Install
+
+```sh
+helm install ister oci://ghcr.io/ister-app/charts/ister --version 1.1.2
+```
+
+**Full changelog**: https://github.com/ister-app/chart/compare/v1.1.1...v1.1.2
+
 ## ister-chart v1.1.1
 
 | Component | Image | Version |
