@@ -28,7 +28,10 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
-  HELM_VERSION: v3.21.3
+  # Kept in step with release.yml's setup-helm pin: the chart is packaged with the helm
+  # it was linted and e2e-tested with. Renovate tracks this line through the custom
+  # manager in renovate.json -- without it only release.yml moved and the two drifted.
+  HELM_VERSION: v3.22.0
 
 jobs:
   lint:
