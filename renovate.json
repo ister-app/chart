@@ -28,9 +28,10 @@
       "automerge": true
     },
     {
-      "description": "GitHub Actions. Grouped, and chore(deps) rather than fix(deps) so a bumped action does not release a new chart -- .github/ is not among the paths release.yml diffs. Needs the RENOVATE_TOKEN PAT with the workflow scope: GITHUB_TOKEN may not push changes under .github/workflows/.",
+      "description": "GitHub Actions, plus ci.yml's HELM_VERSION through the custom manager below. Grouped, and chore(deps) rather than fix(deps) so a bumped action does not release a new chart -- .github/ is not among the paths release.yml diffs. Needs the RENOVATE_TOKEN PAT with the workflow scope: GITHUB_TOKEN may not push changes under .github/workflows/.",
       "matchManagers": [
-        "github-actions"
+        "github-actions",
+        "custom.regex"
       ],
       "groupName": "github actions",
       "semanticCommitType": "chore",
@@ -57,6 +58,20 @@
         "patch"
       ],
       "automerge": true
+    }
+  ],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "ci.yml pins helm in an env var, which no manager reads: the actions manager only sees the setup-helm version input in release.yml, so a bump moved the packaging helm and left the tested one behind. The rule above puts this in the actions group; a major still falls through to the majors rule and opens a PR.",
+      "managerFilePatterns": [
+        "/^\\.github/workflows/ci\\.yml$/"
+      ],
+      "matchStrings": [
+        "HELM_VERSION: (?<currentValue>v[0-9][^\\s]*)"
+      ],
+      "depNameTemplate": "helm/helm",
+      "datasourceTemplate": "github-releases"
     }
   ]
 }
