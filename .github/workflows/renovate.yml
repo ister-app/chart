@@ -50,10 +50,14 @@ jobs:
       # Only the repository config (renovate.json) is allowed to steer Renovate.
       RENOVATE_REQUIRE_CONFIG: required
       RENOVATE_ONBOARDING: "false"
-      # A fixed identity rather than whatever the token resolves to: the author must stay
-      # stable across runs and tokens — Renovate uses it to tell its own commits from a
-      # human's on the same branch — and GITHUB_TOKEN could not answer /user.
-      RENOVATE_USERNAME: github-actions[bot]
+      # The account the token actually belongs to, not a fixed name: Renovate looks its own
+      # issues and PRs up filtered by this login, so a mismatch means it never finds the
+      # dependency dashboard and opens a fresh one — one per pass, three a day, which is
+      # where issues #3..#28 came from. Hardcoded per token because GITHUB_TOKEN cannot
+      # answer /user; with the PAT gone the fallback's own identity is the bot.
+      RENOVATE_USERNAME: ${{ secrets.RENOVATE_TOKEN && 'tijder' || 'github-actions[bot]' }}
+      # The commit author is a separate thing and does stay fixed across runs and tokens:
+      # Renovate uses it to tell its own commits from a human's on the same branch.
       RENOVATE_GIT_AUTHOR: github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>
       LOG_LEVEL: info
     steps:
