@@ -21,6 +21,19 @@ commonLabels: {}
 # Applied to every pod. The website image (Forgejo) may need one.
 imagePullSecrets: []
 
+# How many superseded revisions every workload in this chart keeps. Empty leaves the
+# field off and Kubernetes keeps its own default of ten.
+#
+# Set it to 0 if you run trivy-operator or another scanner that owns its findings from
+# the ReplicaSet: those old ReplicaSets keep a VulnerabilityReport alive for an image
+# that no longer runs anywhere, and the alert points at a pod you cannot find. 0 is the
+# only value that fixes it -- with 2 the revision you just upgraded away from, the one
+# holding the vulnerable image, is exactly what stays. It costs `kubectl rollout undo`,
+# which is no loss under GitOps where a rollback is a revert of these values.
+#
+# Override per component with <component>.revisionHistoryLimit.
+revisionHistoryLimit: null
+
 serviceAccount:
   create: true
   name: ""
@@ -53,6 +66,8 @@ server:
   # The cache volume is ReadWriteOnce, so >1 replica cannot schedule.
   # The chart fails the render if you raise this without switching to RWX.
   replicaCount: 1
+  # Empty inherits the top-level revisionHistoryLimit.
+  revisionHistoryLimit: null
 
   contextPath: /api
 
@@ -263,6 +278,8 @@ helpers: []
 #     existingClaim: ""
 #   extraEnv: []
 #   podAnnotations: {}
+#   # Empty inherits the top-level revisionHistoryLimit.
+#   revisionHistoryLimit: null
 
 # ============================================================
 # Website (frontend)
@@ -278,6 +295,8 @@ website:
     digest: ""
     pullPolicy: IfNotPresent
   replicaCount: 1
+  # Empty inherits the top-level revisionHistoryLimit.
+  revisionHistoryLimit: null
   port: 8080
   # Extra env vars for the nginx that serves the player. CROSS_ORIGIN_ISOLATION=off
   # disables the COOP/COEP headers if the app is embedded cross-origin.
@@ -443,6 +462,8 @@ database:
     storageClass: ""
     storageSize: 8Gi
     retain: true
+    # Empty inherits the top-level revisionHistoryLimit.
+    revisionHistoryLimit: null
     # Use a pre-existing PVC for PGDATA instead of creating one.
     existingClaim: ""
 
@@ -523,6 +544,10 @@ database:
 # ============================================================
 rabbitmq:
   enabled: true
+  # Empty inherits the top-level revisionHistoryLimit. This is a StatefulSet, so the
+  # field bounds ControllerRevisions rather than ReplicaSets and buys no alert hygiene;
+  # it is here so one value governs every workload.
+  revisionHistoryLimit: null
   image:
     repository: rabbitmq
     tag: "4.3.5-management-alpine"
@@ -589,6 +614,8 @@ externalRabbitmq:
 # ============================================================
 typesense:
   enabled: true
+  # Empty inherits the top-level revisionHistoryLimit.
+  revisionHistoryLimit: null
   image:
     repository: docker.io/typesense/typesense
     tag: "30.2"

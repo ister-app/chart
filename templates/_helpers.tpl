@@ -71,6 +71,37 @@ Usage: {{ include "ister.image" (dict "ctx" . "image" .Values.server.image) }}
 {{- end -}}
 {{- end }}
 
+{{/*
+Render the revisionHistoryLimit line for a workload, or nothing.
+
+Kubernetes keeps ten superseded ReplicaSets per Deployment by default. trivy-operator
+hangs its VulnerabilityReport off the ReplicaSet as an ownerReference, so those keep
+reporting — and alerting on — vulnerabilities in images that stopped running long ago.
+Setting this to 0 is the only value that helps: with 2 the just-replaced revision, the
+one carrying the image you upgraded away from, is precisely what stays behind. The
+price is `kubectl rollout undo`, which is no loss under GitOps, where a rollback is a
+revert of the values.
+
+On a StatefulSet the field bounds retained ControllerRevisions instead, and trivy-operator
+owns its report from the StatefulSet directly, so it buys no alert hygiene there — it is
+wired up all the same so one value governs every workload the chart ships.
+
+Empty (the default) omits the field and leaves Kubernetes' own default in place.
+Usage:
+  {{- with (include "ister.revisionHistoryLimit" (dict "ctx" . "override" .Values.server.revisionHistoryLimit)) }}
+  {{ . }}
+  {{- end }}
+*/}}
+{{- define "ister.revisionHistoryLimit" -}}
+{{- $v := .override -}}
+{{- if kindIs "invalid" $v -}}
+{{- $v = .ctx.Values.revisionHistoryLimit -}}
+{{- end -}}
+{{- if not (kindIs "invalid" $v) -}}
+revisionHistoryLimit: {{ $v }}
+{{- end -}}
+{{- end }}
+
 {{- define "ister.serviceAccountName" -}}
 {{- if .Values.serviceAccount.create -}}
 {{- default (include "ister.fullname" .) .Values.serviceAccount.name -}}

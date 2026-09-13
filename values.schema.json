@@ -502,6 +502,14 @@
           "items": {
             "type": "object"
           }
+        },
+        "revisionHistoryLimit": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "description": "Overrides the top-level revisionHistoryLimit for this component. null inherits it."
         }
       },
       "required": [
@@ -643,6 +651,14 @@
               "type": "boolean"
             }
           }
+        },
+        "revisionHistoryLimit": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "description": "Overrides the top-level revisionHistoryLimit for this component. null inherits it."
         }
       }
     },
@@ -795,6 +811,14 @@
                   "type": "object"
                 }
               }
+            },
+            "revisionHistoryLimit": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 0,
+              "description": "Overrides the top-level revisionHistoryLimit for this component. null inherits it."
             }
           }
         },
@@ -1039,6 +1063,14 @@
               "type": "object"
             }
           }
+        },
+        "revisionHistoryLimit": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "description": "Overrides the top-level revisionHistoryLimit for this component. null inherits it."
         }
       }
     },
@@ -1192,6 +1224,14 @@
               }
             }
           }
+        },
+        "revisionHistoryLimit": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "description": "Overrides the top-level revisionHistoryLimit for this component. null inherits it."
         }
       }
     },
@@ -1435,6 +1475,14 @@
           },
           "podAnnotations": {
             "type": "object"
+          },
+          "revisionHistoryLimit": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0,
+            "description": "Overrides the top-level revisionHistoryLimit for this component. null inherits it."
           }
         }
       }
@@ -1453,6 +1501,14 @@
           }
         }
       }
+    },
+    "revisionHistoryLimit": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0,
+      "description": "Superseded revisions to keep. null omits the field and Kubernetes keeps ten. 0 stops old ReplicaSets from holding stale scanner findings alive."
     }
   },
   "definitions": {

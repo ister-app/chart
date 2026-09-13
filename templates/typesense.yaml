@@ -30,6 +30,9 @@ metadata:
     {{- include "ister.labels" (dict "ctx" . "component" "typesense") | nindent 4 }}
 spec:
   replicas: 1
+  {{- with (include "ister.revisionHistoryLimit" (dict "ctx" . "override" .Values.typesense.revisionHistoryLimit)) }}
+  {{ . }}
+  {{- end }}
   selector:
     matchLabels:
       {{- include "ister.selectorLabels" (dict "ctx" . "component" "typesense") | nindent 6 }}

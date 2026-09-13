@@ -6,6 +6,9 @@ metadata:
     {{- include "ister.labels" (dict "ctx" . "component" "website") | nindent 4 }}
 spec:
   replicas: {{ .Values.website.replicaCount }}
+  {{- with (include "ister.revisionHistoryLimit" (dict "ctx" . "override" .Values.website.revisionHistoryLimit)) }}
+  {{ . }}
+  {{- end }}
   selector:
     matchLabels:
       {{- include "ister.selectorLabels" (dict "ctx" . "component" "website") | nindent 6 }}

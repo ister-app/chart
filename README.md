@@ -189,6 +189,16 @@ helm template ister . -f values-production.yaml | kubectl apply --dry-run=server
   you switch `cache.accessMode` to `ReadWriteMany`.
 - PVCs are annotated `helm.sh/resource-policy: keep`, so `helm uninstall` does not delete
   your database. Set `*.retain=false` to opt out.
+- **`revisionHistoryLimit`** is off by default, so Kubernetes keeps ten superseded
+  ReplicaSets per Deployment. Set the top-level value to `0` if you run trivy-operator or
+  another scanner that owns its findings from the ReplicaSet: those old ReplicaSets keep a
+  `VulnerabilityReport` alive for an image that no longer runs anywhere, and the alert then
+  names a pod you cannot find. `0` is the only value that helps — at `2` the revision you
+  just upgraded away from, the one holding the vulnerable image, is exactly what stays.
+  The price is `kubectl rollout undo`, which is no loss under GitOps, where a rollback is
+  a revert of these values. Every workload the chart ships honours it (server, website,
+  typesense, internal database, `helpers[]` and the RabbitMQ StatefulSet), each with a
+  `<component>.revisionHistoryLimit` override.
 - `/.well-known/ister` is served by the website pod (`website.wellKnown`, default on);
   the ingress-nginx `server-snippet` in `ingress.wellKnown` is the legacy path, and
   modern ingress-nginx drops it silently (`allow-snippet-annotations=false`).

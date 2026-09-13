@@ -9,6 +9,9 @@ metadata:
     {{- include "ister.labels" (dict "ctx" . "component" "server") | nindent 4 }}
 spec:
   replicas: {{ .Values.server.replicaCount }}
+  {{- with (include "ister.revisionHistoryLimit" (dict "ctx" . "override" .Values.server.revisionHistoryLimit)) }}
+  {{ . }}
+  {{- end }}
   selector:
     matchLabels:
       {{- include "ister.selectorLabels" (dict "ctx" . "component" "server") | nindent 6 }}

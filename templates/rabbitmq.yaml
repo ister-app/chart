@@ -54,6 +54,9 @@ metadata:
 spec:
   serviceName: {{ $fullname }}-rabbitmq-headless
   replicas: 1
+  {{- with (include "ister.revisionHistoryLimit" (dict "ctx" . "override" $rmq.revisionHistoryLimit)) }}
+  {{ . }}
+  {{- end }}
   selector:
     matchLabels:
       {{- include "ister.selectorLabels" (dict "ctx" . "component" "rabbitmq") | nindent 6 }}
