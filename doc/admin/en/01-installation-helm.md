@@ -230,6 +230,38 @@ Where each component stands, measured on kind with `ipFamily: ipv4`, kind with
   API is unaffected either way. Its readiness probe runs over `127.0.0.1` inside the
   container, so such an image reports Ready even where its Service is dead — check the
   Service, not the pod, if the player does not load.
+- **RabbitMQ's management port** (15672) rides along on the same Service as AMQP. The
+  chart itself never reaches it across the network, so this only matters if *you* want
+  to open the management UI or API through that Service on an IPv6-primary cluster: pin
+  `rabbitmq.service` to `[IPv4]` for that, at the price of an IPv4 AMQP ClusterIP.
+
+### Changing the family of an existing Service
+
+A pin you set (or remove) later does not simply take effect, because a ClusterIP is
+immutable. Measured against a dual-stack Kubernetes 1.36 apiserver:
+
+- **Adding** a family in place is allowed. `ipFamilyPolicy: RequireDualStack` (or
+  `PreferDualStack`) with `ipFamilies: [<current>, <other>]` keeps the existing ClusterIP
+  and allocates a second one alongside it. No interruption.
+- **Changing the primary** family is refused: `spec.clusterIPs[0]: Invalid value:
+  "10.121.107.45": expected an IPv6 value as indicated by ipFamilies[0]`. A `helm
+  upgrade` aborts on that error.
+- **Removing** the pin does nothing at all, and says nothing either. With `ipFamilies`
+  absent, the apiserver fills in the values the Service already has, so it silently keeps
+  its old family. The release looks up to date and the Service is unchanged.
+
+Going back to the cluster default after a pin is therefore a recreate — first make sure
+the new values are applied, then:
+
+```sh
+kubectl -n <namespace> delete svc <release>-typesense
+helm upgrade ...    # Helm 3 creates release resources that are missing
+```
+
+Between the two the name has no ClusterIP, so pick a moment when a short interruption of
+that component is acceptable. If you deploy the chart through a GitOps tool, note that
+the delete is drift, not a revision change: ArgoCD with `automated` but without
+`selfHeal` will leave the Service missing until you trigger a sync yourself.
 
 ## Network policies and pod security
 

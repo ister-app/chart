@@ -313,7 +313,9 @@ website:
     # The pinned image listens dual-stack, so no pin is needed on any cluster. Only an
     # image that binds IPv4 only needs ipFamilyPolicy: SingleStack and
     # ipFamilies: [IPv4] here on an IPv6-primary cluster — without it the ingress
-    # answers 503 while the pod looks fine.
+    # answers 503 while the pod looks fine. Setting or clearing this on a Service that
+    # already exists does not take effect on its own; see the admin documentation,
+    # "Changing the family of an existing Service".
     ipFamilyPolicy: ""
     ipFamilies: []
   # Serve /.well-known/ister (the client discovery document: instance name, OIDC issuer,
@@ -573,8 +575,11 @@ rabbitmq:
   affinity: {}
   service:
     annotations: {}
-    # RabbitMQ listens on IPv4 only unless told otherwise: on an IPv6-primary cluster
-    # set ipFamilyPolicy: SingleStack and ipFamilies: [IPv4].
+    # The AMQP listener (5672) binds :: by itself, so the chart's own traffic needs no
+    # pin on any cluster. The management port (15672) on this same Service is IPv4-only:
+    # pin to ipFamilyPolicy: SingleStack / ipFamilies: [IPv4] only if you want to reach
+    # that port through the Service on an IPv6-primary cluster. Changing this on an
+    # existing Service needs a recreate; see the admin documentation.
     ipFamilyPolicy: ""
     ipFamilies: []
   # The image's own rabbitmq user (uid 999). OnRootMismatch keeps kubelet from
@@ -667,7 +672,9 @@ typesense:
     annotations: {}
     # With the default typesense.apiAddress ("::") no pin is needed on any cluster.
     # Only if you set apiAddress back to 0.0.0.0 on an IPv6-primary cluster does this
-    # Service need ipFamilyPolicy: SingleStack and ipFamilies: [IPv4].
+    # Service need ipFamilyPolicy: SingleStack and ipFamilies: [IPv4]. Note that adding
+    # or removing that pin later does not move an existing Service to the other family;
+    # see the admin documentation, "Changing the family of an existing Service".
     ipFamilyPolicy: ""
     ipFamilies: []
 
