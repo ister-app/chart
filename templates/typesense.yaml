@@ -97,18 +97,26 @@ spec:
           # it forever. The image carries no curl, wget or nc, so an exec probe is not
           # an option here -- set typesense.apiAddress to "::" (preferred), or turn
           # these off.
+          # The index is read from disk before /health answers, so the startup probe is
+          # what keeps kubelet from restarting a pod that is still loading.
+          startupProbe:
+            httpGet:
+              path: /health
+              port: http
+            failureThreshold: {{ .Values.typesense.probes.startup.failureThreshold }}
+            periodSeconds: {{ .Values.typesense.probes.startup.periodSeconds }}
           livenessProbe:
             httpGet:
               path: /health
               port: http
-            initialDelaySeconds: 10
-            periodSeconds: 20
+            periodSeconds: {{ .Values.typesense.probes.liveness.periodSeconds }}
+            failureThreshold: {{ .Values.typesense.probes.liveness.failureThreshold }}
           readinessProbe:
             httpGet:
               path: /health
               port: http
-            initialDelaySeconds: 5
-            periodSeconds: 10
+            periodSeconds: {{ .Values.typesense.probes.readiness.periodSeconds }}
+            failureThreshold: {{ .Values.typesense.probes.readiness.failureThreshold }}
           {{- end }}
           resources:
             {{- toYaml .Values.typesense.resources | nindent 12 }}

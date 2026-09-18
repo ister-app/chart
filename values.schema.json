@@ -819,6 +819,56 @@
               ],
               "minimum": 0,
               "description": "Overrides the top-level revisionHistoryLimit for this component. null inherits it."
+            },
+            "probes": {
+              "type": "object",
+              "properties": {
+                "enabled": {
+                  "type": "boolean"
+                },
+                "startup": {
+                  "type": "object",
+                  "properties": {
+                    "failureThreshold": {
+                      "type": "integer"
+                    },
+                    "periodSeconds": {
+                      "type": "integer"
+                    },
+                    "timeoutSeconds": {
+                      "type": "integer"
+                    }
+                  }
+                },
+                "liveness": {
+                  "type": "object",
+                  "properties": {
+                    "failureThreshold": {
+                      "type": "integer"
+                    },
+                    "periodSeconds": {
+                      "type": "integer"
+                    },
+                    "timeoutSeconds": {
+                      "type": "integer"
+                    }
+                  }
+                },
+                "readiness": {
+                  "type": "object",
+                  "properties": {
+                    "failureThreshold": {
+                      "type": "integer"
+                    },
+                    "periodSeconds": {
+                      "type": "integer"
+                    },
+                    "timeoutSeconds": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
             }
           }
         },
@@ -1117,6 +1167,39 @@
           "properties": {
             "enabled": {
               "type": "boolean"
+            },
+            "startup": {
+              "type": "object",
+              "properties": {
+                "failureThreshold": {
+                  "type": "integer"
+                },
+                "periodSeconds": {
+                  "type": "integer"
+                }
+              }
+            },
+            "liveness": {
+              "type": "object",
+              "properties": {
+                "failureThreshold": {
+                  "type": "integer"
+                },
+                "periodSeconds": {
+                  "type": "integer"
+                }
+              }
+            },
+            "readiness": {
+              "type": "object",
+              "properties": {
+                "failureThreshold": {
+                  "type": "integer"
+                },
+                "periodSeconds": {
+                  "type": "integer"
+                }
+              }
             }
           }
         },

@@ -468,6 +468,26 @@ database:
     revisionHistoryLimit: null
     # Use a pre-existing PVC for PGDATA instead of creating one.
     existingClaim: ""
+    # exec pg_isready. Generous timeout/threshold: with the default 1s timeout and 3
+    # failures a busy node (an HLS transcode, say) can starve pg_isready three probes in
+    # a row, and kubelet then kills a healthy database. The startup probe covers the
+    # other end -- after an unclean shutdown PostgreSQL replays WAL before it accepts
+    # connections, and on a large database that outlasts the liveness budget, which
+    # would restart it into the same recovery over and over.
+    probes:
+      enabled: true
+      startup:
+        failureThreshold: 30
+        periodSeconds: 10
+        timeoutSeconds: 5
+      liveness:
+        periodSeconds: 10
+        timeoutSeconds: 5
+        failureThreshold: 6
+      readiness:
+        periodSeconds: 5
+        timeoutSeconds: 5
+        failureThreshold: 3
 
     # Run as the image's own postgres user (uid 999). The entrypoint chmods
     # /var/run/postgresql and chowns PGDATA; as root with capabilities dropped those
@@ -641,6 +661,21 @@ typesense:
   # them off if you cannot make Typesense listen on the right family.
   probes:
     enabled: true
+    # Typesense reads its whole index from disk before it answers /health, and how long
+    # that takes grows with the collection. The startup probe is what buys it that time:
+    # without one, liveness starts counting immediately and kubelet kills a pod that is
+    # doing exactly what it should -- after which the restart begins the same load
+    # again. 30 x 10s = 5 minutes; raise failureThreshold for a large index or slow
+    # storage. liveness and readiness only begin once it has succeeded.
+    startup:
+      failureThreshold: 30
+      periodSeconds: 10
+    liveness:
+      periodSeconds: 20
+      failureThreshold: 3
+    readiness:
+      periodSeconds: 10
+      failureThreshold: 3
   # Provide via existingSecret (key: api-key) outside of dev.
   apiKey: ""
   existingSecret: ""

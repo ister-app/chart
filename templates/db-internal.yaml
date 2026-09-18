@@ -87,23 +87,33 @@ spec:
           volumeMounts:
             - name: data
               mountPath: /var/lib/postgresql/data
+          {{- if .Values.database.internal.probes.enabled }}
+          {{- $probes := .Values.database.internal.probes }}
+          {{- $pgIsReady := list "pg_isready" "-U" .Values.database.internal.user }}
           # Generous timeout/threshold: with the default 1s timeout and 3 failures a
           # busy node (e.g. an HLS transcode during the e2e) can starve pg_isready
           # three probes in a row, and kubelet then kills a perfectly healthy
-          # database mid-test.
+          # database mid-test. The startup probe covers WAL replay after an unclean
+          # shutdown, which on a large database outlasts even that liveness budget.
+          startupProbe:
+            exec:
+              command: {{ toJson $pgIsReady }}
+            failureThreshold: {{ $probes.startup.failureThreshold }}
+            periodSeconds: {{ $probes.startup.periodSeconds }}
+            timeoutSeconds: {{ $probes.startup.timeoutSeconds }}
           livenessProbe:
             exec:
-              command: [pg_isready, -U, {{ .Values.database.internal.user | quote }}]
-            initialDelaySeconds: 10
-            periodSeconds: 10
-            timeoutSeconds: 5
-            failureThreshold: 6
+              command: {{ toJson $pgIsReady }}
+            periodSeconds: {{ $probes.liveness.periodSeconds }}
+            timeoutSeconds: {{ $probes.liveness.timeoutSeconds }}
+            failureThreshold: {{ $probes.liveness.failureThreshold }}
           readinessProbe:
             exec:
-              command: [pg_isready, -U, {{ .Values.database.internal.user | quote }}]
-            initialDelaySeconds: 5
-            periodSeconds: 5
-            timeoutSeconds: 5
+              command: {{ toJson $pgIsReady }}
+            periodSeconds: {{ $probes.readiness.periodSeconds }}
+            timeoutSeconds: {{ $probes.readiness.timeoutSeconds }}
+            failureThreshold: {{ $probes.readiness.failureThreshold }}
+          {{- end }}
           resources:
             {{- toYaml .Values.database.internal.resources | nindent 12 }}
       volumes:
