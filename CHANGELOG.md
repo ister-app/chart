@@ -1,5 +1,32 @@
 # Changelog
 
+## ister-chart v1.3.0
+
+| Component | Image | Version |
+|---|---|---|
+| server | `ghcr.io/ister-app/server` | 4.2.0 |
+| website | `ghcr.io/ister-app/player` | 2.9.0 |
+| migrations | `ghcr.io/ister-app/migrations` | 4.2.0 |
+| database | `postgres` | 18.6 |
+| typesense | `docker.io/typesense/typesense` | 30.2 |
+| rabbitmq | `rabbitmq` | 4.3.6-management-alpine |
+
+### Features
+
+- feat: startup probes for Typesense and the internal database ([`70114a5`](https://github.com/ister-app/chart/commit/70114a5))
+
+### Other
+
+- docs: how to change the IP family of an existing Service ([`ed2ec11`](https://github.com/ister-app/chart/commit/ed2ec11))
+
+### Install
+
+```sh
+helm install ister oci://ghcr.io/ister-app/charts/ister --version 1.3.0
+```
+
+**Full changelog**: https://github.com/ister-app/chart/compare/v1.2.3...v1.3.0
+
 ## ister-chart v1.2.3
 
 | Component | Image | Version |
