@@ -291,7 +291,7 @@ website:
     # The image's nginx listens dual-stack and sets the COOP/COEP headers itself, so
     # the player needs no Service pin and no route filter on any cluster. Point this at
     # an image of your own and check both before you do.
-    tag: "2.10.0"
+    tag: "2.11.0"
     digest: ""
     pullPolicy: IfNotPresent
   replicaCount: 1
