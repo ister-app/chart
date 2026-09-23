@@ -1,5 +1,28 @@
 # Changelog
 
+## ister-chart v1.3.4
+
+| Component | Image | Version |
+|---|---|---|
+| server | `ghcr.io/ister-app/server` | 5.1.0 |
+| website | `ghcr.io/ister-app/player` | 2.11.0 |
+| migrations | `ghcr.io/ister-app/migrations` | 5.1.0 |
+| database | `postgres` | 18.6 |
+| typesense | `docker.io/typesense/typesense` | 30.2 |
+| rabbitmq | `rabbitmq` | 4.3.6-management-alpine |
+
+### Dependency updates
+
+- chore(deps): update ghcr.io/ister-app/server docker tag to v5.1.0 ([`37828ab`](https://github.com/ister-app/chart/commit/37828ab))
+
+### Install
+
+```sh
+helm install ister oci://ghcr.io/ister-app/charts/ister --version 1.3.4
+```
+
+**Full changelog**: https://github.com/ister-app/chart/compare/v1.3.3...v1.3.4
+
 ## ister-chart v1.3.3
 
 | Component | Image | Version |
