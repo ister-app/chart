@@ -39,8 +39,14 @@ token is volkomen geldig, valideert prima en logt de gebruiker in — waarna él
 kijk eerst naar het token als dit gebeurt (plak het in `jwt.io`, of decodeer het middelste
 segment met `base64 -d`).
 
-**De audience wordt niet gecontroleerd.** De server controleert de handtekening en de
-issuer, niet `aud`, dus een audience-mapper heb je niet nodig.
+**De audience wordt alleen gecontroleerd als je erom vraagt.** Standaard controleert de
+server de handtekening en de issuer, niet `aud`, dus elk token van de issuer wordt
+geaccepteerd — ook een dat voor een andere client in dezelfde realm is uitgegeven. Zet
+`server.oidc.audience: ister` om te eisen dat het token voor de client `ister` is
+uitgegeven: het is goed als `aud` `ister` bevat *of* `azp` eraan gelijk is. Keycloak zet
+`azp` in elk access-token, dus met Keycloak werkt de controle zonder mapper; voor issuers
+die geen `azp` meegeven voeg je een audience-mapper toe die `ister` in `aud` van het
+access-token zet.
 
 **De issuer moet vanaf drie plekken op dezelfde URL bereikbaar zijn**: vanaf de
 serverpod (die haalt de JWKS op), vanaf de browser of app (die doet de login), en vanaf
@@ -114,6 +120,16 @@ rollen, de `roles`-protocolmapper en de drie redirect-URI's.
             "id.token.claim": "false",
             "userinfo.token.claim": "true"
           }
+        },
+        {
+          "name": "ister audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.client.audience": "ister",
+            "access.token.claim": "true",
+            "id.token.claim": "false"
+          }
         }
       ]
     }
@@ -128,7 +144,10 @@ Hetzelfde bij elkaar klikken in de adminconsole: **Realm roles** → maak `user`
 `admin`; **Clients** → maak `ister` aan, client authentication uit, standard flow aan;
 **Clients → ister → Client scopes → ister-dedicated → Add mapper → By configuration →
 User Realm Role**, met token claim name `roles`, "Multivalued" aan en "Add to access
-token" aan. De rollen ken je toe onder **Users → *gebruiker* → Role mapping**.
+token" aan. De rollen ken je toe onder **Users → *gebruiker* → Role mapping**. De
+audience-mapper (alleen nodig met `server.oidc.audience` op een niet-Keycloak-issuer,
+verder onschadelijk) is **Add mapper → By configuration → Audience**, included client
+audience `ister`, "Add to access token" aan.
 
 Twee Keycloak-eigenaardigheden die je beter vooraf weet:
 
@@ -139,6 +158,23 @@ Twee Keycloak-eigenaardigheden die je beter vooraf weet:
   niet nodig, alleen als je tegen de API wilt scripten — `curl -d grant_type=password -d
   client_id=ister -d username=… -d password=…` is de snelste manier om de claims in een
   token te bekijken.
+
+## Productie-checklist
+
+Het voorbeeld hierboven is al productiewaardig. Wat het onderscheidt van een realm die
+alleen op een laptop werkt:
+
+- **Exacte redirect-URI's**, geen kale `*`: `https://<jouw-host>/redirect.html`,
+  `app.ister.player:/oauth2redirect` en `http://localhost:*`. De poort-wildcard op de
+  loopback is de enige wildcard die de player nodig heeft. Met een `*`-redirect kan elke
+  site die een login kan starten de authorization code opvangen.
+- **Exacte web origins** (`https://<jouw-host>`), geen `*`.
+- **Direct access grants uit.** Zet ze weer uit als je ze voor de tokencontrole hieronder
+  had aangezet; de app gebruikt de password grant nooit.
+- **PKCE `S256` verplicht** en client authentication uit — het is een public client.
+- **`server.oidc.audience: ister`** zodra de realm meer dan één applicatie bedient, met de
+  audience-mapper op issuers die geen `azp` meegeven.
+- De platte `roles`-claim en een e-mailadres op elke gebruiker, zoals hierboven beschreven.
 
 ## Andere issuers
 
@@ -179,4 +215,6 @@ curl -s -X POST https://ister.example.com/api/graphql \
 ```
 
 Een `403` met een token dat `user` bevat betekent dat de claim niet gelezen wordt; een
-`401` betekent dat de handtekening of de issuer niet bij `server.oidc.url` past.
+`401` betekent dat de handtekening of de issuer niet bij `server.oidc.url` past — of, met
+`server.oidc.audience` gezet, dat het token voor een andere client is uitgegeven (`aud`
+noch `azp` bevat `ister`).

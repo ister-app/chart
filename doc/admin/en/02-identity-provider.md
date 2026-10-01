@@ -39,8 +39,13 @@ single query comes back `403`. That reads like a broken server, not a claim mapp
 check the token first when it happens (paste it into `jwt.io`, or decode the middle
 segment with `base64 -d`).
 
-**The audience is not validated.** The server checks the signature and the issuer, not
-`aud`, so you do not need an audience mapper.
+**The audience is checked only when you ask for it.** By default the server validates the
+signature and the issuer, not `aud`, so any token from the issuer is accepted — including
+one minted for a different client in the same realm. Set `server.oidc.audience: ister` to
+require that the token was issued to the `ister` client: it passes when `aud` contains
+`ister` *or* `azp` equals it. Keycloak puts `azp` in every access token, so with Keycloak
+the check works without a mapper; for issuers that do not emit `azp`, add an audience
+mapper that puts `ister` in `aud` of the access token.
 
 **The issuer must be reachable at the same URL from three places**: the server pod (it
 fetches the JWKS), the browser or app (it runs the login flow), and whatever you use to
@@ -113,6 +118,16 @@ two roles, the `roles` protocol mapper and the three redirect URIs.
             "id.token.claim": "false",
             "userinfo.token.claim": "true"
           }
+        },
+        {
+          "name": "ister audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.client.audience": "ister",
+            "access.token.claim": "true",
+            "id.token.claim": "false"
+          }
         }
       ]
     }
@@ -127,7 +142,10 @@ Clicking the same thing together in the admin console: **Realm roles** → creat
 and `admin`; **Clients** → create `ister`, client authentication off, standard flow on;
 **Clients → ister → Client scopes → ister-dedicated → Add mapper → By configuration →
 User Realm Role**, with token claim name `roles`, "Multivalued" on, "Add to access token"
-on. Assign the roles under **Users → *user* → Role mapping**.
+on. Assign the roles under **Users → *user* → Role mapping**. The audience mapper (only
+needed with `server.oidc.audience` on a non-Keycloak issuer, harmless otherwise) is **Add
+mapper → By configuration → Audience**, included client audience `ister`, "Add to access
+token" on.
 
 Two Keycloak specifics worth knowing before they cost you an evening:
 
@@ -138,6 +156,23 @@ Two Keycloak specifics worth knowing before they cost you an evening:
   for the app, only if you want to script against the API — `curl -d grant_type=password
   -d client_id=ister -d username=… -d password=…` is the quickest way to inspect the
   claims in a token.
+
+## Production checklist
+
+The example above is already production-shaped. What separates it from a realm that
+merely works on a laptop:
+
+- **Exact redirect URIs**, no bare `*`: `https://<your-host>/redirect.html`,
+  `app.ister.player:/oauth2redirect` and `http://localhost:*`. The port wildcard on the
+  loopback is the only wildcard the player needs. A `*` redirect lets any site that can
+  trigger a login collect the authorization code.
+- **Exact web origins** (`https://<your-host>`), not `*`.
+- **Direct access grants off.** Turn them back off if you enabled them for the token check
+  below; the app never uses the password grant.
+- **PKCE `S256` required** and client authentication off — it is a public client.
+- **`server.oidc.audience: ister`** when the realm serves more than one application, with
+  the audience mapper on issuers that do not emit `azp`.
+- The flat `roles` claim and an email address on every user, as described above.
 
 ## Other issuers
 
@@ -177,4 +212,6 @@ curl -s -X POST https://ister.example.com/api/graphql \
 ```
 
 A `403` here with a token that carries `user` means the claim is not being read; a `401`
-means the signature or issuer does not match `server.oidc.url`.
+means the signature or issuer does not match `server.oidc.url` — or, with
+`server.oidc.audience` set, that the token was minted for another client (neither `aud`
+nor `azp` carries `ister`).

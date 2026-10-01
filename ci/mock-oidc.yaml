@@ -2,9 +2,10 @@
 #
 # The server needs a real issuer because scanLibraries and every content query are
 # @PreAuthorize("hasRole('user')"). OIDCSecurityConfig reads roles from a flat "roles"
-# claim (JwtGrantedAuthoritiesConverter, authority prefix ROLE_) and does not validate
-# an audience, so a token with {"roles":["user"]} from any issuer is enough. That makes
-# a mock issuer sufficient; a full Keycloak would only be slower.
+# claim (JwtGrantedAuthoritiesConverter, authority prefix ROLE_) and only validates an
+# audience when OIDC_AUDIENCE is set — CI leaves it empty — so a token with
+# {"roles":["user"]} from any issuer is enough. That makes a mock issuer sufficient; a
+# full Keycloak would only be slower.
 #
 # mock-oauth2-server derives the `iss` claim from the request's Host header. The token
 # must therefore be requested with Host: mock-oidc:8080 so that `iss` matches the

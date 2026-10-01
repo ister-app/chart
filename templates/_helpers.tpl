@@ -315,6 +315,10 @@ the caller. Usage: {{ include "ister.serverCommonEnv" . | nindent 12 }}
   value: {{ default .Values.server.name .Values.server.clusterName | quote }}
 - name: OIDC_URL
   value: {{ required "server.oidc.url is required" .Values.server.oidc.url | quote }}
+{{- with .Values.server.oidc.audience }}
+- name: OIDC_AUDIENCE
+  value: {{ . | quote }}
+{{- end }}
 - name: APP_ISTER_SERVER_TMDB_APIKEY
   valueFrom:
     secretKeyRef:

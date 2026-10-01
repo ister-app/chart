@@ -77,6 +77,10 @@ server:
   oidc:
     # OIDC issuer, e.g. https://keycloak.example.com/realms/auth
     url: ""
+    # Optional: the client id a token must be minted for (`aud` contains it, or `azp` equals
+    # it), e.g. "ister". Empty = the server validates issuer and signature only, so a token
+    # issued to another client in the same realm is accepted too.
+    audience: ""
 
   # TMDB API key. Rendered into a Secret, not into the pod spec.
   # Prefer existingSecret (key: tmdb-api-key) over putting the key in values.
