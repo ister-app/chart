@@ -1,5 +1,33 @@
 # Changelog
 
+## ister-chart v1.4.0
+
+| Component | Image | Version |
+|---|---|---|
+| server | `ghcr.io/ister-app/server` | 5.2.0 |
+| website | `ghcr.io/ister-app/player` | 2.12.1 |
+| migrations | `ghcr.io/ister-app/migrations` | 5.2.0 |
+| database | `postgres` | 18.6 |
+| typesense | `docker.io/typesense/typesense` | 30.2 |
+| rabbitmq | `rabbitmq` | 4.3.6-management-alpine |
+
+### Features
+
+- feat(server): optional OIDC audience value and Keycloak checklist ([`f201bec`](https://github.com/ister-app/chart/commit/f201bec))
+
+### Dependency updates
+
+- chore(deps): update ghcr.io/ister-app/server docker tag to v5.2.0 ([`838d7f2`](https://github.com/ister-app/chart/commit/838d7f2))
+- chore(deps): update ghcr.io/ister-app/player docker tag to v2.12.1 ([`1a782ac`](https://github.com/ister-app/chart/commit/1a782ac))
+
+### Install
+
+```sh
+helm install ister oci://ghcr.io/ister-app/charts/ister --version 1.4.0
+```
+
+**Full changelog**: https://github.com/ister-app/chart/compare/v1.3.6...v1.4.0
+
 ## ister-chart v1.3.6
 
 | Component | Image | Version |
