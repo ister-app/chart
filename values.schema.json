@@ -413,6 +413,11 @@
             }
           }
         },
+        "config": {
+          "type": "object",
+          "description": "Spring properties rendered to /config/application.yaml for every server pod. Any key is accepted; env vars (chart-derived and extraEnv) take precedence.",
+          "additionalProperties": true
+        },
         "helper": {
           "type": "object",
           "additionalProperties": false,

@@ -130,6 +130,35 @@ Two more storage knobs matter:
 - `server.tmp` — scratch space for transcoding. Disable it when `mountPath` falls inside
   one of your media volumes, or the dedicated volume shadows that path.
 
+## Server settings — `server.config`
+
+Everything the server reads from its own configuration files can be set under `server.config`,
+a tree of Spring properties the chart renders into a ConfigMap and mounts into every server
+pod (the main server and all helpers) as `/config/application.yaml`. The block in
+`values.yaml` lists the tunables with the server's defaults — cache cleanup, continue
+watching, upload limits, RabbitMQ listener tuning, the Hikari pool, transcode concurrency —
+so the values reference below doubles as the list of what you can change. Any other Spring or
+`app.ister.*` property may be added (see the server docs, chapter Configuration); a change
+rolls the pods through a `checksum/config` annotation.
+
+Precedence, from low to high: the server's built-in defaults, then `server.config`, then
+environment variables. The chart keeps everything it derives from other values as env vars
+(database, broker, search, OIDC, server name and URL, cache and tmp paths, libraries and
+directories, helper disks, hardware acceleration), so those keys have no effect in
+`server.config`; secrets never go there either. `server.extraEnv` still overrides a key set in
+`server.config`, but only under its canonical Spring name
+(`APP_ISTER_SERVER_CACHE_CLEANUP_CRON`): the short aliases the server's own defaults accept
+(`CACHE_CLEANUP_CRON`, `HLS_MAX_CONCURRENT_FILES`, …) are shadowed as soon as `server.config`
+sets that key. Helpers read the same ConfigMap; a per-helper difference goes in
+`helpers[].extraEnv`. If you set `SPRING_CONFIG_ADDITIONAL_LOCATION` yourself, keep
+`file:/config/` in the comma-separated list.
+
+One limit: the server is a GraalVM native image, and Spring decides which beans exist when
+that image is built. A property that only changes a value (a cron, a pool size, a log level,
+health details) works; one that would create a bean that is not in the image does not — the
+Actuator exposure list can be narrowed but not extended, and `enabled`-style feature flags
+only work where the server checks them at runtime.
+
 ## Exposing it: Ingress or Gateway API
 
 Both publish the player at `/` and the API at `server.contextPath` (default `/api`) on one

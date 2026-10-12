@@ -28,6 +28,8 @@ spec:
       annotations:
         # Roll the pods when any referenced credential changes.
         checksum/secrets: {{ include (print $.Template.BasePath "/secrets.yaml") . | sha256sum }}
+        # ... and when server.config changes (the file is only read at start-up).
+        checksum/config: {{ include (print $.Template.BasePath "/server-configmap.yaml") . | sha256sum }}
         {{- with .Values.server.podAnnotations }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
@@ -243,6 +245,10 @@ spec:
               readOnly: true
               {{- end }}
             {{- end }}
+            # server.config; /config is taken, extraVolumeMounts must not reuse it.
+            - name: config
+              mountPath: /config
+              readOnly: true
             {{- include "ister.hwaccelVolumeMounts" .Values.server.hwaccel | nindent 12 }}
             {{- with .Values.server.extraVolumeMounts }}
             {{- toYaml . | nindent 12 }}
@@ -267,6 +273,9 @@ spec:
         - name: media-{{ .name }}
           {{- include "ister.mediaVolumeSource" . | nindent 10 }}
         {{- end }}
+        - name: config
+          configMap:
+            name: {{ include "ister.fullname" . }}-server-config
         {{- include "ister.hwaccelVolumes" .Values.server.hwaccel | nindent 8 }}
         {{- with .Values.server.extraVolumes }}
         {{- toYaml . | nindent 8 }}

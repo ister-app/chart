@@ -56,7 +56,7 @@ podcast, HLS streaming with a real transcode, books, search, watch status); sele
 `podcast-feed.yaml` (serves the generated feed), and `mock-external.yaml` — a WireMock pod
 serving every external metadata source (TMDB, MusicBrainz, Cover Art Archive, Open Library,
 Wikidata/Wikipedia, Commons, iTunes) under path prefixes, wired to the server through
-`server.extraEnv` in `ci/values-ci.yaml`. The `15-metadata` scenario asserts enrichment lands
+`server.externalServices` in `ci/values-ci.yaml`. The `15-metadata` scenario asserts enrichment lands
 and that zero events dead-letter, so an unstubbed call fails CI — extend the stubs when the
 server grows a new external call.
 
@@ -94,7 +94,15 @@ libraries, directories) and `helper-deployments.yaml` renders one Deployment + S
 `helpers[]` entry with the helper-node env (`ister.helperEnv`) instead of libraries. Hardware
 acceleration (`ister.hwaccel*`, `ister.serverPodSecurityContext`, `ister.serverResources`)
 is applied the same way to both. A new server-wide env var belongs in the common template,
-a new per-node one in both callers.
+a new per-node one in both callers. Spring tunables that are not chart-derived live in
+`server.config` (values.yaml) → `templates/server-configmap.yaml`, mounted on both pod kinds at
+`/config` and read via `SPRING_CONFIG_ADDITIONAL_LOCATION`; env still wins. Its defaults are a
+copy of the server's (`server.image.tag` pins which): a key set there shadows the server's
+`${SHORT_ENV:default}` placeholder, so the short env aliases stop working for that key — that is
+why adding a key to `server.config` is a breaking change for `extraEnv` users. The server is a
+native image: `server.config` can only change values bound at runtime, never bean conditions (the
+actuator exposure list cannot be extended — `ci/e2e/05-config.sh` probes `health.show-details`
+for that reason).
 
 **Images all go through `ister.image`** (`_helpers.tpl`), which takes a `{repository, tag, digest}`
 map and prefers the digest. Every image in the chart — including the Flyway wait container and the

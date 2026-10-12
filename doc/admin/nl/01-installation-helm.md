@@ -136,6 +136,34 @@ Twee andere opslagknoppen doen ertoe:
 - `server.tmp` — kladruimte voor transcoderen. Zet dit uit wanneer `mountPath` binnen een
   van je mediavolumes valt, anders overschaduwt het aparte volume dat pad.
 
+## Serverinstellingen — `server.config`
+
+Alles wat de server uit zijn eigen configuratiebestanden leest, is in te stellen onder
+`server.config`: een boom van Spring-properties die de chart in een ConfigMap rendert en in
+elke server-pod (de hoofdserver en alle helpers) mount als `/config/application.yaml`. Het blok
+in `values.yaml` bevat de instelbare properties met de defaults van de server — cache-opruiming,
+verder kijken, uploadlimieten, RabbitMQ-listener-tuning, de Hikari-pool, transcode-gelijktijdigheid
+— zodat de values-referentie hieronder meteen de lijst is van wat je kunt wijzigen. Elke andere
+Spring- of `app.ister.*`-property mag erbij (zie de serverdocumentatie, hoofdstuk Configuratie);
+een wijziging rolt de pods via een `checksum/config`-annotatie.
+
+Voorrang, van laag naar hoog: de ingebouwde defaults van de server, dan `server.config`, dan
+omgevingsvariabelen. Alles wat de chart uit andere values afleidt blijft een env-var (database,
+broker, zoeken, OIDC, servernaam en -URL, cache- en tmp-paden, bibliotheken en mappen,
+helper-schijven, hardwareversnelling), dus die keys hebben in `server.config` geen effect;
+secrets horen er evenmin. `server.extraEnv` overschrijft nog steeds een key uit `server.config`,
+maar alleen onder zijn canonieke Spring-naam (`APP_ISTER_SERVER_CACHE_CLEANUP_CRON`): de korte
+aliassen die de defaults van de server zelf accepteren (`CACHE_CLEANUP_CRON`,
+`HLS_MAX_CONCURRENT_FILES`, …) worden overschaduwd zodra `server.config` die key zet. Helpers
+lezen dezelfde ConfigMap; een verschil per helper gaat in `helpers[].extraEnv`. Zet je zelf
+`SPRING_CONFIG_ADDITIONAL_LOCATION`, houd dan `file:/config/` in de kommagescheiden lijst.
+
+Eén beperking: de server is een GraalVM-native-image, en Spring bepaalt bij het bouwen van dat
+image welke beans bestaan. Een property die alleen een waarde verandert (een cron, een
+poolgrootte, een logniveau, health-details) werkt; een die een bean zou aanmaken die niet in
+het image zit niet — de Actuator-exposure-lijst kun je inperken maar niet uitbreiden, en
+`enabled`-achtige vlaggen werken alleen waar de server ze tijdens runtime controleert.
+
 ## Naar buiten: Ingress of Gateway API
 
 Beide publiceren de player op `/` en de API op `server.contextPath` (standaard `/api`)

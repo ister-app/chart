@@ -1,0 +1,16 @@
+{{- /*
+Spring properties shared by every server pod (main server and helpers): server.config
+rendered as one application.yaml. Mounted at /config and read through
+SPRING_CONFIG_ADDITIONAL_LOCATION (ister.serverCommonEnv); env vars still override it, so
+the chart-owned env and extraEnv keep winning. Both deployments hash this file into a
+checksum/config annotation so a change rolls the pods.
+*/}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "ister.fullname" . }}-server-config
+  labels:
+    {{- include "ister.labels" (dict "ctx" . "component" "server") | nindent 4 }}
+data:
+  application.yaml: |
+    {{- toYaml .Values.server.config | nindent 4 }}

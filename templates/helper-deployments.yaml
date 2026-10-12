@@ -38,6 +38,7 @@ spec:
         {{- end }}
       annotations:
         checksum/secrets: {{ include (print $root.Template.BasePath "/secrets.yaml") $root | sha256sum }}
+        checksum/config: {{ include (print $root.Template.BasePath "/server-configmap.yaml") $root | sha256sum }}
         {{- with $helper.podAnnotations }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
@@ -161,6 +162,10 @@ spec:
               mountPath: /cache
             - name: tmp
               mountPath: /tmp/ister
+            # server.config applies to helpers too (per-helper differences go in extraEnv).
+            - name: config
+              mountPath: /config
+              readOnly: true
             {{- include "ister.hwaccelVolumeMounts" $hwaccel | nindent 12 }}
             {{- with $root.Values.server.extraVolumeMounts }}
             {{- toYaml . | nindent 12 }}
@@ -179,6 +184,9 @@ spec:
         - name: tmp
           emptyDir:
             sizeLimit: {{ $root.Values.server.tmp.sizeLimit }}
+        - name: config
+          configMap:
+            name: {{ $fullname }}-server-config
         {{- include "ister.hwaccelVolumes" $hwaccel | nindent 8 }}
         {{- with $root.Values.server.extraVolumes }}
         {{- toYaml . | nindent 8 }}

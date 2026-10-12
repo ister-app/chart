@@ -25,6 +25,15 @@ server:
     wikipediaSummaryTemplate: http://mock-external:8080/wikipedia/{lang}/summary/{title}
     itunesBase: http://mock-external:8080/itunes
 
+  # Only this ConfigMap turns on health details; ci/e2e/05-config.sh asserts /actuator/health
+  # lists components, which proves server.config reaches the server. (The exposure list cannot
+  # serve as the probe: endpoint beans are frozen at native-image build time.)
+  config:
+    management:
+      endpoint:
+        health:
+          show-details: always
+
   # server.url is deliberately NOT set: the default (http://localhost:8080/api) is what
   # /.well-known/ister advertises, and that is exactly where the player integration
   # tests reach the server through `kubectl port-forward ... 8080:8080`.

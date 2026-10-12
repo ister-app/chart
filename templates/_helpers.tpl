@@ -281,7 +281,7 @@ the caller. Usage: {{ include "ister.serverCommonEnv" . | nindent 12 }}
 */}}
 {{- define "ister.serverCommonEnv" -}}
 {{- $secret := include "ister.databaseSecretName" . }}
-# --- Database. Note DB_PATH, not DB_PORT: that is what core.properties
+# --- Database. Note DB_PATH, not DB_PORT: that is what core.yaml
 # --- interpolates into the JDBC URL. Flyway reads DB_PORT instead.
 - name: DB_HOST
   valueFrom:
@@ -386,6 +386,11 @@ the caller. Usage: {{ include "ister.serverCommonEnv" . | nindent 12 }}
   value: {{ $val | quote }}
 {{- end }}
 {{- end }}
+# --- Spring properties from server.config (templates/server-configmap.yaml). The trailing
+# --- slash makes it a directory location: Spring reads application.yaml from it. Not
+# --- optional on purpose — the mount is unconditional, so a missing file is a bug.
+- name: SPRING_CONFIG_ADDITIONAL_LOCATION
+  value: file:/config/
 {{- end }}
 
 {{/*

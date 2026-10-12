@@ -183,6 +183,12 @@ helm template ister . -f values-production.yaml | kubectl apply --dry-run=server
 - Flyway runs as an **init container** on the server, not a Helm hook. A `pre-install`
   hook cannot work here: in `internal`/`cnpg` mode the database is created by the same
   release, so the hook would wait for a database Helm has not created yet.
+- **Server tunables go in `server.config`**, a Spring-properties tree rendered to a ConfigMap
+  and mounted on every server pod as `/config/application.yaml`
+  (`SPRING_CONFIG_ADDITIONAL_LOCATION`). Its defaults are a copy of the server's, so it also
+  documents what you can set. Env vars still win, but a key set there shadows the server's
+  short `${CACHE_CLEANUP_CRON:…}`-style aliases — override with the canonical
+  `APP_ISTER_…` name or in `server.config` itself.
 - `server.enableServiceLinks` must stay `false`. Kubernetes injects a `TYPESENSE_PORT`
   service-link variable that shadows Spring's `${TYPESENSE_PORT:8108}` placeholder.
 - The cache PVC is `ReadWriteOnce`, so `server.replicaCount` > 1 fails the render unless
@@ -349,7 +355,7 @@ Three levels of test:
   tokens with a `roles: ["user"]` claim. All external metadata sources (TMDB, MusicBrainz,
   Cover Art Archive, Open Library, Wikidata/Wikipedia, Wikimedia Commons, iTunes) are
   served by `ci/mock-external.yaml`, a WireMock pod the server is pointed at via
-  `server.extraEnv` in `ci/values-ci.yaml` — deterministic, offline, no rate limits, no
+  `server.externalServices` in `ci/values-ci.yaml` — deterministic, offline, no rate limits, no
   real TMDB key. `E2E_ONLY='30-*'`/`E2E_SKIP` select scenarios during local iteration.
 - **Player integration tests** — live in the `ister-app/player` repo
   (`integration_test/`) and run the real Flutter app against this same kind deployment:

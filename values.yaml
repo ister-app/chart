@@ -148,7 +148,132 @@ server:
     # Listener concurrency of the heavy handlers; empty = the server default.
     concurrency: ""
 
-  # Extra env vars, e.g. CACHE_CLEANUP_CRON, HLS_MAX_CONCURRENT_FILES.
+  # Spring properties for every server pod (the main server and all helpers), rendered to a
+  # ConfigMap (templates/server-configmap.yaml) and mounted as /config/application.yaml, which
+  # the server reads through SPRING_CONFIG_ADDITIONAL_LOCATION. Precedence, low to high: the
+  # server's built-in defaults < this block < environment variables (what the chart derives
+  # itself plus extraEnv). Anything the chart already owns as an env var (database, broker,
+  # search, OIDC, server name/URL, cache/tmp paths, libraries, directories, helper disks,
+  # hardware acceleration) is therefore NOT listed here: setting it here has no effect. Any
+  # other Spring or app.ister.* property may be added; see the server docs, chapter
+  # Configuration, for the full list. The values below are the server's own defaults (server
+  # 5.2.1) — when a server release changes one, update it here too.
+  #
+  # Because a key set here shadows the server's built-in default, the short env-var names the
+  # server's defaults accept (CACHE_CLEANUP_CRON, HLS_MAX_CONCURRENT_FILES, UPLOAD_*, ...) no
+  # longer apply to these keys. Override them here, or with the canonical Spring env name
+  # (APP_ISTER_SERVER_CACHE_CLEANUP_CRON) in extraEnv.
+  config:
+    logging:
+      level:
+        # Jaffree logs every ffmpeg/ffprobe stderr line (metadata dumps, chapters, each
+        # cropdetect frame): ~40k lines per 10 minutes of scanning. Only real errors are kept.
+        "[com.github.kokorin.jaffree.process.BaseStdReader]": ERROR
+        "[com.github.kokorin.jaffree.ffmpeg.FFmpeg]": ERROR
+    springdoc:
+      swagger-ui:
+        oauth:
+          # OIDC client id the Swagger UI authenticates with.
+          clientId: ister
+    spring:
+      graphql:
+        graphiql:
+          # The GraphiQL IDE on /graphiql.
+          enabled: true
+        websocket:
+          connection-init-timeout: 30s
+          keep-alive: 25s
+      datasource:
+        hikari:
+          # Playback start fans out to many concurrent DB-touching requests; the Hikari default
+          # of 10 was exhausted in production. Fail fast (10s) rather than queue for half a minute.
+          maximum-pool-size: 20
+          connection-timeout: 10000
+      jpa:
+        show-sql: false
+        properties:
+          hibernate:
+            # Lazy associations are loaded in IN-batches instead of one query per entity.
+            default_batch_fetch_size: 50
+      rabbitmq:
+        listener:
+          simple:
+            # One unacknowledged message per consumer: with the default (250) and slow
+            # per-message work (ffprobe) the oldest of a batch hit RabbitMQ's consumer_timeout
+            # and the whole batch was requeued and re-processed.
+            prefetch: 1
+            # Consumers per queue. Transcoding is bounded separately (hls.max-concurrent-files).
+            concurrency: 3
+            # Failed handlers retry with backoff, then the message is dead-lettered.
+            retry:
+              enabled: true
+              max-attempts: 3
+              initial-interval: 2s
+              multiplier: 2
+    management:
+      endpoints:
+        web:
+          exposure:
+            # Actuator endpoints on the monitor port. This list can only be narrowed: the
+            # server is a GraalVM native image and endpoint beans are decided when that image
+            # is built, so adding an endpoint (env, loggers, ...) here has no effect.
+            include: health,metrics,prometheus
+    app:
+      ister:
+        server:
+          # Daily zombie sweep of the image cache and transcode tmp dir. Starts in dry-run so
+          # the first deploy only logs what it would remove; set dry-run: false once verified.
+          cache-cleanup:
+            enabled: true
+            dry-run: true
+            cron: "0 30 4 * * *"
+            min-age: 24h
+          # Downscaled artwork is dropped when nobody looked at it for this long.
+          image-thumbnail:
+            max-idle: 30d
+          # The precomputed continue-watching list: how far back it looks, and the nightly
+          # rebuild that repairs it.
+          continue-watching:
+            history-days: 150
+            rebuild:
+              enabled: true
+            rebuild-cron: "0 30 3 * * *"
+          TMDB:
+            # TMDB allows roughly 40 requests per second; stay safely below that.
+            max-requests-per-second: 30
+          # Images per message of a blur-hash sweep; one chunk must finish well within
+          # RabbitMQ's consumer_timeout (default 30 min).
+          blur-hash:
+            chunk-size: 500
+          # Episodes per intro/outro-detection message; same consumer_timeout constraint.
+          segment-detect:
+            chunk-size: 4
+        # Admin media upload (POST /library-upload/**). chunk-size must fit the ingress'
+        # request body limit.
+        upload:
+          enabled: true
+          chunk-size: 16MB
+          max-active-sessions: 2
+          max-files-per-session: 20000
+          max-concurrent-chunks: 4
+          session-idle-timeout: 24h
+          cleanup-interval: PT1H
+          min-free-space: 5GB
+        # S3 object storage (connections themselves hold credentials: extraEnv/extraEnvFrom).
+        s3:
+          # ffmpeg reads S3 files through the node's own /download proxy; true = presigned URLs.
+          ffmpeg-direct: false
+          presign-ttl: 2h
+          # LRU cache of objects that must be read as a local file (epub/cbz/pdf).
+          local-copy-max-bytes: 2147483648
+        transcoder:
+          hls:
+            # Media files transcoded simultaneously; pre-transcoding shares this budget.
+            max-concurrent-files: 2
+
+  # Extra env vars. For Spring properties prefer server.config above; env still wins when
+  # both are set, but use the canonical name (APP_ISTER_SERVER_CACHE_CLEANUP_CRON), not the
+  # short aliases from the server's defaults — those do not apply to keys server.config sets.
   extraEnv: []
   # Extra envFrom sources (ConfigMaps/Secrets with more settings).
   extraEnvFrom: []
