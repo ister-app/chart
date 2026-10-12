@@ -83,6 +83,60 @@ mig_tag="$(img flyway.image.tag)"
   section "Dependency updates" '(fix|chore)\(deps\):'
   section "Other"              '(chore|docs|ci|build|refactor|test|perf)(\((?!deps\)).+\))?:'
 
+  # server.config pins the server's defaults (ci/config-sync.py). Operators run with these
+  # values, so list what moved since the previous tag — whether the nightly sync or a hand
+  # edit changed it — plus the server keys the sync found and nobody has mirrored yet
+  # (Config-New trailers on the sync commits).
+  if [ -n "$PREV" ]; then
+    prev_values="$(mktemp)"
+    git show "$PREV:values.yaml" > "$prev_values" 2>/dev/null || : > "$prev_values"
+    settings="$(python3 - "$prev_values" values.yaml <<'PY'
+import sys, yaml
+
+def leaves(node, path=()):
+    for key, value in node.items():
+        here = path + (str(key).strip("[]"),)
+        if isinstance(value, dict):
+            yield from leaves(value, here)
+        else:
+            yield ".".join(here), value
+
+def config(path):
+    doc = yaml.safe_load(open(path)) or {}
+    return dict(leaves(doc.get("server", {}).get("config") or {}))
+
+def show(v):
+    return "true" if v is True else "false" if v is False else str(v)
+
+prev, cur = config(sys.argv[1]), config(sys.argv[2])
+for key in sorted(set(prev) | set(cur)):
+    if key not in prev:
+        print(f"- added: `{key}` = `{show(cur[key])}`")
+    elif key not in cur:
+        print(f"- removed: `{key}` (was `{show(prev[key])}`)")
+    elif show(prev[key]) != show(cur[key]):
+        print(f"- changed: `{key}` `{show(prev[key])}` → `{show(cur[key])}`")
+PY
+    )"
+    rm -f "$prev_values"
+    unmirrored="$(git log --no-merges --format='%(trailers:key=Config-New,valueonly)' "$RANGE" |
+      sed '/^$/d' | sort -u | sed 's/^/- `/; s/ = /` = `/; s/$/`/')"
+    if [ -n "$settings" ] || [ -n "$unmirrored" ]; then
+      echo "### Server settings (server.config)"
+      echo
+      if [ -n "$settings" ]; then
+        echo "$settings"
+        echo
+      fi
+      if [ -n "$unmirrored" ]; then
+        echo "Server defaults not yet mirrored in \`server.config\` (set them there or via env):"
+        echo
+        echo "$unmirrored"
+        echo
+      fi
+    fi
+  fi
+
   echo "### Install"
   echo
   echo '```sh'
