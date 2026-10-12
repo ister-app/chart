@@ -425,18 +425,21 @@ def cmd_sync(args):
     if report["removed"] or report["unresolvable"]:
         print("sync only rewrites changed values; fix the keys above by hand", file=sys.stderr)
         return 1
-    if not report["changed"]:
+    lines = text.splitlines(keepends=True)
+    header_stale = any(re.search(r"\(server \d+\.\d+\.\d+\)", lines[i]) and f"(server {tag})" not in lines[i]
+                       for i in range(0, start))
+    if not report["changed"] and not header_stale:
         print(report_text(report, tag))
         return 0
 
-    lines = text.splitlines(keepends=True)
     for item in report["changed"]:
         idx = leaf_lines[item["key"]]
         match = KEY_LINE.match(lines[idx])
         token, tail = split_value(match.group("rest"))
         newline = "\n" if lines[idx].endswith("\n") else ""
         lines[idx] = f"{match.group('indent')}{match.group('key')}: {render_scalar(item['server'], token)}{tail}{newline}"
-    # The header comment names the server version the values come from.
+    # The header comment names the server version the values come from (also rewritten when
+    # only the tag moved and no value changed, so the comment never lags the pin).
     for idx in range(0, start):
         lines[idx] = re.sub(r"\(server \d+\.\d+\.\d+\)", f"(server {tag})", lines[idx])
     new_text = "".join(lines)
@@ -447,7 +450,8 @@ def cmd_sync(args):
     with open(VALUES, "w", encoding="utf-8") as fh:
         fh.write(new_text)
     print(report_text(report, tag))
-    print(f"values.yaml: {len(report['changed'])} value(s) updated to server v{tag}")
+    print(f"values.yaml: {len(report['changed'])} value(s) updated to server v{tag}"
+          + ("" if report["changed"] else " (header comment only)"))
     return 0
 
 
