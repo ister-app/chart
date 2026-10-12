@@ -59,7 +59,7 @@ server:
     # 3.0.0 is the floor for this chart's own e2e, not just a routine bump: it renamed the
     # admin mutation scanLibrary to scanLibraries, which ci/e2e/10-scan.sh drives the scan
     # with. Deploying an older server here makes that scenario fail on an undefined field.
-    tag: "5.2.1"
+    tag: "5.2.2"
     digest: ""
     pullPolicy: IfNotPresent
 
@@ -157,7 +157,7 @@ server:
   # hardware acceleration) is therefore NOT listed here: setting it here has no effect. Any
   # other Spring or app.ister.* property may be added; see the server docs, chapter
   # Configuration, for the full list. The values below are the server's own defaults
-  # (server 5.2.1); ci/config-sync.py keeps them that way: the nightly Renovate run rewrites
+  # (server 5.2.2); ci/config-sync.py keeps them that way: the nightly Renovate run rewrites
   # a default the pinned server release changed, CI fails on any other mismatch, and a key the
   # server gained is only reported — decide there whether it is a tunable (add it here) or
   # chart-derived (an env var in the templates).
