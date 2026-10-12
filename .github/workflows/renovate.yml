@@ -108,6 +108,27 @@ jobs:
         with:
           token: ${{ secrets.RENOVATE_TOKEN || secrets.GITHUB_TOKEN }}
 
+      # Renovate may just have fast-forwarded main with a new server.image.tag. Mirror the
+      # defaults that server release changed into server.config (ci/config-sync.py) before the
+      # release runs, as a fix(server) commit so the ConfigMap change ships as a patch. Keys the
+      # server dropped or derives cannot be fixed automatically: the step fails and no release is
+      # dispatched tonight, the same contract as a first-party major that breaks the e2e. New
+      # server keys are only reported (log warning + Config-New trailer for the release notes).
+      - name: Sync server.config with the pinned server release
+        run: |
+          git pull --ff-only origin main
+          ./ci/config-sync.py sync --report config-sync.json
+          if git diff --quiet values.yaml; then
+            echo "server.config already matches the pinned server"
+            exit 0
+          fi
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add values.yaml
+          ./ci/config-sync.py commit-message --report config-sync.json > commit-message.txt
+          git commit -F commit-message.txt
+          git push origin HEAD:main
+
       # A push made with GITHUB_TOKEN never triggers another workflow, and release.yml has
       # no schedule of its own any more — this is the daily release. force=false leaves the
       # decision to release.yml's `changes` job: it diffs main against the previous tag, so

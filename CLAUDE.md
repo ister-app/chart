@@ -102,7 +102,15 @@ copy of the server's (`server.image.tag` pins which): a key set there shadows th
 why adding a key to `server.config` is a breaking change for `extraEnv` users. The server is a
 native image: `server.config` can only change values bound at runtime, never bean conditions (the
 actuator exposure list cannot be extended — `ci/e2e/05-config.sh` probes `health.show-details`
-for that reason).
+for that reason). `ci/config-sync.py` keeps the block equal to the pinned server's defaults:
+`check` runs in the CI lint job (blocking on a changed/removed/derived key, warning on a new server
+key), `sync` runs in renovate.yml after the image bump and commits `fix(server): sync server.config
+with server vX` with `Config-Changed`/`Config-New` trailers that `ci/release-notes.sh` turns into a
+"Server settings" section. Two lists in that script need care: `CODE_DEFAULT_EXCEPTIONS` (pinned
+keys whose default lives in server code, not in a module YAML) and `CHART_MANAGED` (server keys the
+chart sets as env vars or that are secrets/invariants) — **a new server env var in the templates
+goes into `CHART_MANAGED` too**, or the check reports it as an unreviewed server key.
+`make config-check SERVER_DIR=../server` compares against a local server checkout.
 
 **Images all go through `ister.image`** (`_helpers.tpl`), which takes a `{repository, tag, digest}`
 map and prefers the digest. Every image in the chart — including the Flyway wait container and the

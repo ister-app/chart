@@ -153,6 +153,12 @@ sets that key. Helpers read the same ConfigMap; a per-helper difference goes in
 `helpers[].extraEnv`. If you set `SPRING_CONFIG_ADDITIONAL_LOCATION` yourself, keep
 `file:/config/` in the comma-separated list.
 
+The defaults in the block are those of the server release the chart pins (`server.image.tag`),
+and the chart keeps them that way: when a server release changes a default, the next chart
+release carries the new value, and its release notes list every `server.config` key that was
+added, changed or removed, plus any new server setting the chart does not mirror yet. A value
+you set yourself in your own values file is never touched by that.
+
 One limit: the server is a GraalVM native image, and Spring decides which beans exist when
 that image is built. A property that only changes a value (a cron, a pool size, a log level,
 health details) works; one that would create a bean that is not in the image does not — the

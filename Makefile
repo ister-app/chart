@@ -5,6 +5,8 @@
 #   make e2e         — run the API end-to-end scenarios (ci/e2e.sh)
 #   make player-e2e  — run the player's Flutter integration tests against the cluster
 #   make down        — delete the kind cluster
+#   make config-check — compare server.config with the pinned server's defaults (ci/config-sync.py)
+#   make config-sync  — rewrite the drifted values; SERVER_DIR=../server reads a checkout instead of GitHub
 
 CLUSTER_NAME ?= ister
 EXPOSURE     ?= nodeport
@@ -13,7 +15,7 @@ RELEASE      ?= ister
 TESTDATA_DIR ?= $(abspath ../testdata)
 PLAYER_DIR   ?= $(abspath ../player)
 
-.PHONY: fixtures up e2e e2e-ingress player-e2e down
+.PHONY: fixtures up e2e e2e-ingress player-e2e down config-check config-sync
 
 fixtures:
 	cd $(TESTDATA_DIR) && ./create_mkv.sh || true
@@ -50,3 +52,10 @@ player-e2e:
 
 down:
 	kind delete cluster --name $(CLUSTER_NAME)
+
+# server.config must equal the defaults of the server values.yaml pins; see ci/config-sync.py.
+config-check:
+	ci/config-sync.py check $(if $(SERVER_DIR),--server-dir $(SERVER_DIR))
+
+config-sync:
+	ci/config-sync.py sync $(if $(SERVER_DIR),--server-dir $(SERVER_DIR))

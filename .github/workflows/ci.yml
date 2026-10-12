@@ -103,6 +103,12 @@ jobs:
       - name: Build the docs zip
         run: ./ci/build-docs.sh 0.0.0-ci
 
+      # server.config pins a copy of the server's defaults; a default the pinned server
+      # release changed must be mirrored (renovate.yml does that nightly, this guards the
+      # rest: a hand-edited value, a key the server dropped). New server keys only warn.
+      - name: server.config matches the pinned server's defaults
+        run: ./ci/config-sync.py check
+
   e2e:
     name: End-to-end on kind (${{ matrix.name }})
     runs-on: ubuntu-latest

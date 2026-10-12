@@ -158,6 +158,12 @@ aliassen die de defaults van de server zelf accepteren (`CACHE_CLEANUP_CRON`,
 lezen dezelfde ConfigMap; een verschil per helper gaat in `helpers[].extraEnv`. Zet je zelf
 `SPRING_CONFIG_ADDITIONAL_LOCATION`, houd dan `file:/config/` in de kommagescheiden lijst.
 
+De defaults in het blok zijn die van de serverrelease die de chart pint (`server.image.tag`), en
+de chart houdt ze zo: wijzigt een serverrelease een default, dan draagt de volgende chartrelease
+de nieuwe waarde, en de release notes sommen elke `server.config`-key op die is toegevoegd,
+gewijzigd of verwijderd, plus nieuwe serverinstellingen die de chart nog niet spiegelt. Een
+waarde die je zelf in je eigen values-bestand zet, wordt daardoor nooit aangeraakt.
+
 Eén beperking: de server is een GraalVM-native-image, en Spring bepaalt bij het bouwen van dat
 image welke beans bestaan. Een property die alleen een waarde verandert (een cron, een
 poolgrootte, een logniveau, health-details) werkt; een die een bean zou aanmaken die niet in

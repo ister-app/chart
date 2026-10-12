@@ -188,7 +188,9 @@ helm template ister . -f values-production.yaml | kubectl apply --dry-run=server
   (`SPRING_CONFIG_ADDITIONAL_LOCATION`). Its defaults are a copy of the server's, so it also
   documents what you can set. Env vars still win, but a key set there shadows the server's
   short `${CACHE_CLEANUP_CRON:…}`-style aliases — override with the canonical
-  `APP_ISTER_…` name or in `server.config` itself.
+  `APP_ISTER_…` name or in `server.config` itself. `ci/config-sync.py` keeps the block equal
+  to the pinned server's defaults (nightly sync commit, blocking CI check); the release notes
+  list every value that moved.
 - `server.enableServiceLinks` must stay `false`. Kubernetes injects a `TYPESENSE_PORT`
   service-link variable that shadows Spring's `${TYPESENSE_PORT:8108}` placeholder.
 - The cache PVC is `ReadWriteOnce`, so `server.replicaCount` > 1 fails the render unless
