@@ -1,5 +1,85 @@
 # Changelog
 
+## ister-chart v2.0.0
+
+| Component | Image | Version |
+|---|---|---|
+| server | `ghcr.io/ister-app/server` | 5.2.2 |
+| website | `ghcr.io/ister-app/player` | 2.14.0 |
+| migrations | `ghcr.io/ister-app/migrations` | 5.2.2 |
+| database | `postgres` | 18.6 |
+| typesense | `docker.io/typesense/typesense` | 30.2 |
+| rabbitmq | `rabbitmq` | 4.3.6-management-alpine |
+
+### Breaking changes
+
+- feat(server)!: expose tunable Spring properties as server.config ([`b193a29`](https://github.com/ister-app/chart/commit/b193a29))
+
+### Features
+
+- feat(ci): keep server.config in sync with the pinned server's defaults ([`69fe4d6`](https://github.com/ister-app/chart/commit/69fe4d6))
+- feat(release): list server.config changes in the release notes ([`5af25fd`](https://github.com/ister-app/chart/commit/5af25fd))
+
+### Fixes
+
+- fix(ci): config-sync refreshes the header version without value changes ([`9f40800`](https://github.com/ister-app/chart/commit/9f40800))
+
+### Dependency updates
+
+- fix(deps): update ghcr.io/ister-app/server docker tag to v5.2.2 ([`96d7c3b`](https://github.com/ister-app/chart/commit/96d7c3b))
+- chore(deps): update renovatebot/github-action action to v46.3.8 ([`a01acaa`](https://github.com/ister-app/chart/commit/a01acaa))
+
+### Server settings (server.config)
+
+- added: `app.ister.s3.ffmpeg-direct` = `false`
+- added: `app.ister.s3.local-copy-max-bytes` = `2147483648`
+- added: `app.ister.s3.presign-ttl` = `2h`
+- added: `app.ister.server.TMDB.max-requests-per-second` = `30`
+- added: `app.ister.server.blur-hash.chunk-size` = `500`
+- added: `app.ister.server.cache-cleanup.cron` = `0 30 4 * * *`
+- added: `app.ister.server.cache-cleanup.dry-run` = `true`
+- added: `app.ister.server.cache-cleanup.enabled` = `true`
+- added: `app.ister.server.cache-cleanup.min-age` = `24h`
+- added: `app.ister.server.continue-watching.history-days` = `150`
+- added: `app.ister.server.continue-watching.rebuild-cron` = `0 30 3 * * *`
+- added: `app.ister.server.continue-watching.rebuild.enabled` = `true`
+- added: `app.ister.server.image-thumbnail.max-idle` = `30d`
+- added: `app.ister.server.segment-detect.chunk-size` = `4`
+- added: `app.ister.transcoder.hls.max-concurrent-files` = `2`
+- added: `app.ister.upload.chunk-size` = `16MB`
+- added: `app.ister.upload.cleanup-interval` = `PT1H`
+- added: `app.ister.upload.enabled` = `true`
+- added: `app.ister.upload.max-active-sessions` = `2`
+- added: `app.ister.upload.max-concurrent-chunks` = `4`
+- added: `app.ister.upload.max-files-per-session` = `20000`
+- added: `app.ister.upload.min-free-space` = `5GB`
+- added: `app.ister.upload.session-idle-timeout` = `24h`
+- added: `logging.level.com.github.kokorin.jaffree.ffmpeg.FFmpeg` = `ERROR`
+- added: `logging.level.com.github.kokorin.jaffree.process.BaseStdReader` = `ERROR`
+- added: `management.endpoints.web.exposure.include` = `health,metrics,prometheus`
+- added: `spring.datasource.hikari.connection-timeout` = `10000`
+- added: `spring.datasource.hikari.maximum-pool-size` = `20`
+- added: `spring.graphql.graphiql.enabled` = `true`
+- added: `spring.graphql.websocket.connection-init-timeout` = `30s`
+- added: `spring.graphql.websocket.keep-alive` = `25s`
+- added: `spring.jpa.properties.hibernate.default_batch_fetch_size` = `50`
+- added: `spring.jpa.show-sql` = `false`
+- added: `spring.rabbitmq.listener.simple.concurrency` = `3`
+- added: `spring.rabbitmq.listener.simple.prefetch` = `1`
+- added: `spring.rabbitmq.listener.simple.retry.enabled` = `true`
+- added: `spring.rabbitmq.listener.simple.retry.initial-interval` = `2s`
+- added: `spring.rabbitmq.listener.simple.retry.max-attempts` = `3`
+- added: `spring.rabbitmq.listener.simple.retry.multiplier` = `2`
+- added: `springdoc.swagger-ui.oauth.clientId` = `ister`
+
+### Install
+
+```sh
+helm install ister oci://ghcr.io/ister-app/charts/ister --version 2.0.0
+```
+
+**Full changelog**: https://github.com/ister-app/chart/compare/v1.4.2...v2.0.0
+
 ## ister-chart v1.4.2
 
 | Component | Image | Version |
