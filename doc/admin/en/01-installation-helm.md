@@ -136,8 +136,7 @@ Everything the server reads from its own configuration files can be set under `s
 a tree of Spring properties the chart renders into a ConfigMap and mounts into every server
 pod (the main server and all helpers) as `/config/application.yaml`. The block in
 `values.yaml` lists the tunables with the server's defaults — cache cleanup, continue
-watching, upload limits, RabbitMQ listener tuning, the Hikari pool, virtual threads, transcode
-concurrency —
+watching, upload limits, RabbitMQ listener tuning, the Hikari pool, transcode concurrency —
 so the values reference below doubles as the list of what you can change. Any other Spring or
 `app.ister.*` property may be added (see the server docs, chapter Configuration); a change
 rolls the pods through a `checksum/config` annotation.

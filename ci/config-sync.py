@@ -70,6 +70,9 @@ CHART_MANAGED = {
     # paths and binaries of the image (CACHE_DIR / TMP_DIR env, image layout)
     "app.ister.server.cache-dir", "app.ister.server.tmp-dir", "app.ister.server.ffmpeg-dir",
     "app.ister.server.mkvextract", "app.ister.s3.local-copy-dir",
+    # baked into the native image: it drives bean conditions, frozen at image build time, so
+    # setting it in server.config would silently do nothing
+    "spring.threads.virtual.enabled",
     # hardware acceleration (hwaccel values), helper concurrency (server.helper / helpers[])
     "app.ister.transcoder.hls.hwaccel", "app.ister.transcoder.hls.hwaccel-device",
     "app.ister.helper.concurrency",
