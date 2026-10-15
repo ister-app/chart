@@ -179,6 +179,13 @@ server:
           # OIDC client id the Swagger UI authenticates with.
           clientId: ister
     spring:
+      # Tomcat, the RabbitMQ listeners and the schedulers on virtual threads: an HLS request
+      # that waits for the transcoder no longer occupies one of Tomcat's platform threads.
+      # A Spring Boot property, so older releases honour it too; the server-side change that
+      # makes a waiting request cheap (no pooled DB connection held) ships in server 5.3.
+      threads:
+        virtual:
+          enabled: true
       graphql:
         graphiql:
           # The GraphiQL IDE on /graphiql.

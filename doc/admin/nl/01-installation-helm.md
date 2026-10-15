@@ -142,8 +142,8 @@ Alles wat de server uit zijn eigen configuratiebestanden leest, is in te stellen
 `server.config`: een boom van Spring-properties die de chart in een ConfigMap rendert en in
 elke server-pod (de hoofdserver en alle helpers) mount als `/config/application.yaml`. Het blok
 in `values.yaml` bevat de instelbare properties met de defaults van de server — cache-opruiming,
-verder kijken, uploadlimieten, RabbitMQ-listener-tuning, de Hikari-pool, transcode-gelijktijdigheid
-— zodat de values-referentie hieronder meteen de lijst is van wat je kunt wijzigen. Elke andere
+verder kijken, uploadlimieten, RabbitMQ-listener-tuning, de Hikari-pool, virtual threads,
+transcode-gelijktijdigheid — zodat de values-referentie hieronder meteen de lijst is van wat je kunt wijzigen. Elke andere
 Spring- of `app.ister.*`-property mag erbij (zie de serverdocumentatie, hoofdstuk Configuratie);
 een wijziging rolt de pods via een `checksum/config`-annotatie.
 
