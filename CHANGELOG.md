@@ -1,5 +1,39 @@
 # Changelog
 
+## ister-chart v2.1.0
+
+| Component | Image | Version |
+|---|---|---|
+| server | `ghcr.io/ister-app/server` | 5.3.0 |
+| website | `ghcr.io/ister-app/player` | 2.14.1 |
+| migrations | `ghcr.io/ister-app/migrations` | 5.3.0 |
+| database | `postgres` | 18.6 |
+| typesense | `docker.io/typesense/typesense` | 30.2 |
+| rabbitmq | `rabbitmq` | 4.3.6-management-alpine |
+
+### Features
+
+- feat(config): pin spring.threads.virtual.enabled in server.config ([`d7b8cf2`](https://github.com/ister-app/chart/commit/d7b8cf2))
+
+### Fixes
+
+- fix(server): sync server.config with server v5.3.0 ([`812db81`](https://github.com/ister-app/chart/commit/812db81))
+- fix(config): spring.threads.virtual.enabled is baked into the server image, not a tunable ([`2f57984`](https://github.com/ister-app/chart/commit/2f57984))
+
+### Dependency updates
+
+- chore(deps): update ghcr.io/ister-app/server docker tag to v5.3.0 ([`0df572d`](https://github.com/ister-app/chart/commit/0df572d))
+- chore(deps): update github actions to v3.22.1 ([`b37a3ee`](https://github.com/ister-app/chart/commit/b37a3ee))
+- chore(deps): update ghcr.io/ister-app/player docker tag to v2.14.1 ([`03dee55`](https://github.com/ister-app/chart/commit/03dee55))
+
+### Install
+
+```sh
+helm install ister oci://ghcr.io/ister-app/charts/ister --version 2.1.0
+```
+
+**Full changelog**: https://github.com/ister-app/chart/compare/v2.0.1...v2.1.0
+
 ## ister-chart v2.0.1
 
 | Component | Image | Version |
