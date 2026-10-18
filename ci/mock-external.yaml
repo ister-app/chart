@@ -1171,6 +1171,17 @@ data:
         "jsonBody": {"results": [{"collectionName": "Ister Test Cast", "artistName": "Ister Testdata", "feedUrl": "http://podcast-feed:8080/feed.xml", "artworkUrl600": "http://mock-external:8080/img/itunes/artwork.jpg"}]}
       }
     }
+  # The Ludusavi save-location manifest the worker fetches for PC/Steam games: a two-entry
+  # stand-in, so a game library in the fixtures resolves save paths without GitHub.
+  ludusavi-manifest.json: |
+    {
+      "request": {"method": "GET", "urlPathPattern": "/ludusavi/manifest.yaml"},
+      "response": {
+        "status": 200,
+        "headers": {"Content-Type": "text/plain"},
+        "body": "Stardew Valley:\n  files:\n    <winAppData>/StardewValley/Saves:\n      tags: [save]\n      when:\n        - os: windows\n  steam:\n    id: 413150\n  cloud:\n    steam: true\nCeleste:\n  files:\n    <base>/Saves:\n      tags: [save]\n  steam:\n    id: 504230\n"
+      }
+    }
   images.json: |
     {
       "request": {"method": "GET", "urlPathPattern": "/img/.*"},

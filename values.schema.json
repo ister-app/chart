@@ -378,6 +378,9 @@
             },
             "itunesBase": {
               "type": "string"
+            },
+            "ludusaviManifestUrl": {
+              "type": "string"
             }
           }
         },

@@ -380,7 +380,8 @@ the caller. Usage: {{ include "ister.serverCommonEnv" . | nindent 12 }}
     "APP_ISTER_WORKER_WIKIDATA_ENTITY_BASE" $ext.wikidataEntityBase
     "APP_ISTER_WORKER_WIKIDATA_API_BASE" $ext.wikidataApiBase
     "APP_ISTER_WORKER_WIKIPEDIA_SUMMARY_TEMPLATE" $ext.wikipediaSummaryTemplate
-    "APP_ISTER_API_PODCAST_ITUNES_BASE" $ext.itunesBase }}
+    "APP_ISTER_API_PODCAST_ITUNES_BASE" $ext.itunesBase
+    "APP_ISTER_WORKER_LUDUSAVI_MANIFEST_URL" $ext.ludusaviManifestUrl }}
 {{- if $val }}
 - name: {{ $env }}
   value: {{ $val | quote }}

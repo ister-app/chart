@@ -24,6 +24,7 @@ server:
     wikidataApiBase: http://mock-external:8080/wikidata/api
     wikipediaSummaryTemplate: http://mock-external:8080/wikipedia/{lang}/summary/{title}
     itunesBase: http://mock-external:8080/itunes
+    ludusaviManifestUrl: http://mock-external:8080/ludusavi/manifest.yaml
 
   # Only this ConfigMap turns on health details; ci/e2e/05-config.sh asserts /actuator/health
   # lists components, which proves server.config reaches the server. (The exposure list cannot
