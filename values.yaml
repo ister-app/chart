@@ -259,16 +259,11 @@ server:
           enabled: true
           chunk-size: 16MB
           max-active-sessions: 2
-          max-files-per-session: 100000
+          max-files-per-session: 20000
           max-concurrent-chunks: 4
           session-idle-timeout: 24h
           cleanup-interval: PT1H
           min-free-space: 5GB
-        # Game libraries: the per-user save cloud (GameSaveService).
-        games:
-          save-retention: 10
-          save-max-bytes: 512MB
-          achievement-icon-max-bytes: 512KB
         # S3 object storage (connections themselves hold credentials: extraEnv/extraEnvFrom).
         s3:
           # ffmpeg reads S3 files through the node's own /download proxy; true = presigned URLs.
