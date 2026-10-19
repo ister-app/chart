@@ -159,7 +159,7 @@ server:
   # hardware acceleration) is therefore NOT listed here: setting it here has no effect. Any
   # other Spring or app.ister.* property may be added; see the server docs, chapter
   # Configuration, for the full list. The values below are the server's own defaults
-  # (server 5.3.0); ci/config-sync.py keeps them that way: the nightly Renovate run rewrites
+  # (server 5.4.0); ci/config-sync.py keeps them that way: the nightly Renovate run rewrites
   # a default the pinned server release changed, CI fails on any other mismatch, and a key the
   # server gained is only reported — decide there whether it is a tunable (add it here) or
   # chart-derived (an env var in the templates).
@@ -259,7 +259,7 @@ server:
           enabled: true
           chunk-size: 16MB
           max-active-sessions: 2
-          max-files-per-session: 20000
+          max-files-per-session: 100000
           max-concurrent-chunks: 4
           session-idle-timeout: 24h
           cleanup-interval: PT1H
