@@ -1,5 +1,52 @@
 # Changelog
 
+## ister-chart v2.2.0
+
+| Component | Image | Version |
+|---|---|---|
+| server | `ghcr.io/ister-app/server` | 5.4.0 |
+| website | `ghcr.io/ister-app/player` | 2.15.0 |
+| migrations | `ghcr.io/ister-app/migrations` | 5.4.0 |
+| database | `postgres` | 18.6 |
+| typesense | `docker.io/typesense/typesense` | 30.2 |
+| rabbitmq | `rabbitmq` | 4.3.6-management-alpine |
+
+### Features
+
+- feat(games): game tunables and Ludusavi manifest endpoint ([`c29a9f9`](https://github.com/ister-app/chart/commit/c29a9f9))
+
+### Fixes
+
+- fix(server): sync server.config with server v5.4.0 ([`b879200`](https://github.com/ister-app/chart/commit/b879200))
+- fix(config): keep server.config at the pinned server's defaults ([`525d071`](https://github.com/ister-app/chart/commit/525d071))
+
+### Dependency updates
+
+- chore(deps): update ghcr.io/ister-app/server docker tag to v5.4.0 ([`a8e0b7a`](https://github.com/ister-app/chart/commit/a8e0b7a))
+- chore(deps): update ghcr.io/ister-app/player docker tag to v2.15.0 ([`8f83577`](https://github.com/ister-app/chart/commit/8f83577))
+- chore(deps): update renovatebot/github-action action to v46.3.9 ([`f299556`](https://github.com/ister-app/chart/commit/f299556))
+
+### Server settings (server.config)
+
+- changed: `app.ister.upload.max-files-per-session` `20000` → `100000`
+
+Server defaults not yet mirrored in `server.config` (set them there or via env):
+
+- `app.ister.games.achievement-icon-max-bytes` = `512KB`
+- `app.ister.games.save-max-bytes` = `512MB`
+- `app.ister.games.save-retention` = `10`
+- `app.ister.server.background-nice` = `10`
+- `app.ister.server.nice-path` = `/usr/bin/nice`
+- `app.ister.server.segment-detect.concurrency` = `1`
+
+### Install
+
+```sh
+helm install ister oci://ghcr.io/ister-app/charts/ister --version 2.2.0
+```
+
+**Full changelog**: https://github.com/ister-app/chart/compare/v2.1.0...v2.2.0
+
 ## ister-chart v2.1.0
 
 | Component | Image | Version |
