@@ -1,5 +1,51 @@
 # Changelog
 
+## ister-chart v2.2.1
+
+| Component | Image | Version |
+|---|---|---|
+| server | `ghcr.io/ister-app/server` | 5.7.0 |
+| website | `ghcr.io/ister-app/player` | 2.17.0 |
+| migrations | `ghcr.io/ister-app/migrations` | 5.7.0 |
+| database | `postgres` | 18.6 |
+| typesense | `docker.io/typesense/typesense` | 30.2 |
+| rabbitmq | `rabbitmq` | 4.3.6-management-alpine |
+
+### Fixes
+
+- fix(server): sync server.config with server v5.7.0 ([`b4c4cc3`](https://github.com/ister-app/chart/commit/b4c4cc3))
+- fix(server): sync server.config with server v5.6.0 ([`441671e`](https://github.com/ister-app/chart/commit/441671e))
+- fix(server): sync server.config with server v5.5.0 ([`037287e`](https://github.com/ister-app/chart/commit/037287e))
+
+### Dependency updates
+
+- chore(deps): update ghcr.io/ister-app/server docker tag to v5.7.0 ([`c062182`](https://github.com/ister-app/chart/commit/c062182))
+- chore(deps): update ghcr.io/ister-app/player docker tag to v2.17.0 ([`90c1538`](https://github.com/ister-app/chart/commit/90c1538))
+- chore(deps): update renovatebot/github-action action to v46.3.10 ([`45ea77e`](https://github.com/ister-app/chart/commit/45ea77e))
+- chore(deps): update ghcr.io/ister-app/server docker tag to v5.6.0 ([`4724e2b`](https://github.com/ister-app/chart/commit/4724e2b))
+- chore(deps): update ghcr.io/ister-app/player docker tag to v2.16.0 ([`6129630`](https://github.com/ister-app/chart/commit/6129630))
+- chore(deps): update ghcr.io/ister-app/server docker tag to v5.5.0 ([`044db79`](https://github.com/ister-app/chart/commit/044db79))
+
+### Server settings (server.config)
+
+Server defaults not yet mirrored in `server.config` (set them there or via env):
+
+- `app.ister.games.achievement-icon-max-bytes` = `512KB`
+- `app.ister.games.save-max-bytes` = `512MB`
+- `app.ister.games.save-retention` = `10`
+- `app.ister.server.background-nice` = `10`
+- `app.ister.server.nice-path` = `/usr/bin/nice`
+- `app.ister.server.segment-detect.concurrency` = `1`
+- `spring.http.clients.imperative.factory` = `jdk`
+
+### Install
+
+```sh
+helm install ister oci://ghcr.io/ister-app/charts/ister --version 2.2.1
+```
+
+**Full changelog**: https://github.com/ister-app/chart/compare/v2.2.0...v2.2.1
+
 ## ister-chart v2.2.0
 
 | Component | Image | Version |
