@@ -706,7 +706,7 @@ rabbitmq:
   revisionHistoryLimit: null
   image:
     repository: rabbitmq
-    tag: "4.3.6-management-alpine"
+    tag: "4.4.0-management-alpine"
     digest: ""
     pullPolicy: IfNotPresent
   auth:
@@ -923,5 +923,5 @@ podDisruptionBudget:
 tests:
   image:
     repository: curlimages/curl
-    tag: "8.22.0"
+    tag: "8.23.0"
     pullPolicy: IfNotPresent
