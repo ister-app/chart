@@ -81,9 +81,9 @@ jobs:
 
       - uses: azure/setup-helm@v5
         with:
-          # Same major as ci.yml's HELM_VERSION: the chart is linted and e2e-tested with
-          # helm 3, so it is packaged with helm 3. A helm 4 bump is a PR, not an automerge.
-          version: v3.22.1
+          # Same version as ci.yml's HELM_VERSION: the chart is packaged with the helm it
+          # was linted and e2e-tested with. A helm major bump is a PR, not an automerge.
+          version: v4.3.1
 
       - name: Work out the new chart version
         id: version

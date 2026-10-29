@@ -24,7 +24,7 @@ to try it out, not a production setup.
 
 ## Prerequisites
 
-- A Kubernetes cluster and Helm 3.
+- A Kubernetes cluster and Helm 3 or 4.
 - A [TMDB API key](https://www.themoviedb.org/settings/api) for movie/show metadata.
 - An OIDC issuer (for example Keycloak) — ister does not manage users itself. It has to
   be set up a particular way; see [Setting up the identity provider](02-identity-provider.md).
@@ -290,7 +290,7 @@ the new values are applied, then:
 
 ```sh
 kubectl -n <namespace> delete svc <release>-typesense
-helm upgrade ...    # Helm 3 creates release resources that are missing
+helm upgrade ...    # Helm recreates release resources that are missing
 ```
 
 Between the two the name has no ClusterIP, so pick a moment when a short interruption of

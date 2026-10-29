@@ -24,7 +24,7 @@ mediavolumes — genoeg om het te proberen, geen productie-opstelling.
 
 ## Vereisten
 
-- Een Kubernetes-cluster en Helm 3.
+- Een Kubernetes-cluster en Helm 3 of 4.
 - Een [TMDB API-key](https://www.themoviedb.org/settings/api) voor film-/seriemetadata.
 - Een OIDC-issuer (bijvoorbeeld Keycloak) — ister beheert zelf geen gebruikers. Die moet
   op een bepaalde manier ingericht zijn; zie
