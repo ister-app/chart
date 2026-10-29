@@ -4,7 +4,7 @@
 # reaches the Envoy Service with a port-forward: ci/exposure/gateway-envoy-forward.sh.
 set -euo pipefail
 NAMESPACE="${NAMESPACE:-ister}"
-EG_VERSION="${EG_VERSION:-1.9.1}"
+EG_VERSION="${EG_VERSION:-1.9.3}"
 
 helm upgrade --install eg oci://docker.io/envoyproxy/gateway-helm --version "$EG_VERSION" \
   -n envoy-gateway-system --create-namespace --wait --timeout 5m
