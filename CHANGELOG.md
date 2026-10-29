@@ -1,5 +1,35 @@
 # Changelog
 
+## ister-chart v2.2.3
+
+| Component | Image | Version |
+|---|---|---|
+| server | `ghcr.io/ister-app/server` | 6.0.0 |
+| website | `ghcr.io/ister-app/player` | 2.17.0 |
+| migrations | `ghcr.io/ister-app/migrations` | 6.0.0 |
+| database | `postgres` | 18.6 |
+| typesense | `docker.io/typesense/typesense` | 30.2 |
+| rabbitmq | `rabbitmq` | 4.4.0-management-alpine |
+
+### Fixes
+
+- fix(server): sync server.config with server v6.0.0 ([`6d905b2`](https://github.com/ister-app/chart/commit/6d905b2))
+
+### Dependency updates
+
+- chore(deps): update ghcr.io/ister-app/server docker tag to v6 ([`b42a014`](https://github.com/ister-app/chart/commit/b42a014))
+- chore(deps): update helm to v4.3.1 ([`aebb43b`](https://github.com/ister-app/chart/commit/aebb43b))
+- chore(deps): bump CI images (mock-oauth2-server 6.1.4, python 3.15, envoy gateway 1.9.3) ([`b844a48`](https://github.com/ister-app/chart/commit/b844a48))
+- fix(deps): rabbitmq 4.3.6 -> 4.4.0-management-alpine, curl 8.22.0 -> 8.23.0 ([`014b0e2`](https://github.com/ister-app/chart/commit/014b0e2))
+
+### Install
+
+```sh
+helm install ister oci://ghcr.io/ister-app/charts/ister --version 2.2.3
+```
+
+**Full changelog**: https://github.com/ister-app/chart/compare/v2.2.2...v2.2.3
+
 ## ister-chart v2.2.2
 
 | Component | Image | Version |
