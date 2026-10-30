@@ -1,5 +1,45 @@
 # Changelog
 
+## ister-chart v2.2.4
+
+| Component | Image | Version |
+|---|---|---|
+| server | `ghcr.io/ister-app/server` | 6.0.1 |
+| website | `ghcr.io/ister-app/player` | 2.17.1 |
+| migrations | `ghcr.io/ister-app/migrations` | 6.0.1 |
+| database | `postgres` | 18.6 |
+| typesense | `docker.io/typesense/typesense` | 30.2 |
+| rabbitmq | `rabbitmq` | 4.4.0-management-alpine |
+
+### Fixes
+
+- fix(server): sync server.config with server v6.0.1 ([`8a8c406`](https://github.com/ister-app/chart/commit/8a8c406))
+
+### Dependency updates
+
+- chore(deps): update ghcr.io/ister-app/server docker tag to v6.0.1 ([`572a562`](https://github.com/ister-app/chart/commit/572a562))
+- chore(deps): update ghcr.io/ister-app/player docker tag to v2.17.1 ([`9c93cb3`](https://github.com/ister-app/chart/commit/9c93cb3))
+
+### Server settings (server.config)
+
+Server defaults not yet mirrored in `server.config` (set them there or via env):
+
+- `app.ister.games.achievement-icon-max-bytes` = `512KB`
+- `app.ister.games.save-max-bytes` = `512MB`
+- `app.ister.games.save-retention` = `10`
+- `app.ister.server.background-nice` = `10`
+- `app.ister.server.nice-path` = `/usr/bin/nice`
+- `app.ister.server.segment-detect.concurrency` = `1`
+- `spring.http.clients.imperative.factory` = `jdk`
+
+### Install
+
+```sh
+helm install ister oci://ghcr.io/ister-app/charts/ister --version 2.2.4
+```
+
+**Full changelog**: https://github.com/ister-app/chart/compare/v2.2.3...v2.2.4
+
 ## ister-chart v2.2.3
 
 | Component | Image | Version |
