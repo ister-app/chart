@@ -83,7 +83,7 @@ jobs:
         with:
           # Same version as ci.yml's HELM_VERSION: the chart is packaged with the helm it
           # was linted and e2e-tested with. A helm major bump is a PR, not an automerge.
-          version: v4.3.1
+          version: v4.3.2
 
       - name: Work out the new chart version
         id: version
