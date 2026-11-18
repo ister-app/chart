@@ -1,5 +1,51 @@
 # Changelog
 
+## ister-chart v2.2.5
+
+| Component | Image | Version |
+|---|---|---|
+| server | `ghcr.io/ister-app/server` | 6.0.2 |
+| website | `ghcr.io/ister-app/player` | 2.18.0 |
+| migrations | `ghcr.io/ister-app/migrations` | 6.0.2 |
+| database | `postgres` | 18.6 |
+| typesense | `docker.io/typesense/typesense` | 30.2 |
+| rabbitmq | `rabbitmq` | 4.4.1-management-alpine |
+
+### Fixes
+
+- fix(server): sync server.config with server v6.0.2 ([`bdbf41c`](https://github.com/ister-app/chart/commit/bdbf41c))
+
+### Dependency updates
+
+- chore(deps): update ghcr.io/ister-app/player docker tag to v2.18.0 ([`8b4fc12`](https://github.com/ister-app/chart/commit/8b4fc12))
+- chore(deps): update rabbitmq docker tag to v4.4.1 ([`3ca883d`](https://github.com/ister-app/chart/commit/3ca883d))
+- chore(deps): update ghcr.io/ister-app/server docker tag to v6.0.2 ([`fb62c02`](https://github.com/ister-app/chart/commit/fb62c02))
+- chore(deps): update renovatebot/github-action action to v46.3.14 ([`45eaac0`](https://github.com/ister-app/chart/commit/45eaac0))
+- chore(deps): update github actions to v4.3.2 ([`0a3cd61`](https://github.com/ister-app/chart/commit/0a3cd61))
+- chore(deps): update renovatebot/github-action action to v46.3.13 ([`0900017`](https://github.com/ister-app/chart/commit/0900017))
+- chore(deps): update renovatebot/github-action action to v46.3.12 ([`c8c7586`](https://github.com/ister-app/chart/commit/c8c7586))
+- chore(deps): update renovatebot/github-action action to v46.3.11 ([`dff4dc2`](https://github.com/ister-app/chart/commit/dff4dc2))
+
+### Server settings (server.config)
+
+Server defaults not yet mirrored in `server.config` (set them there or via env):
+
+- `app.ister.games.achievement-icon-max-bytes` = `512KB`
+- `app.ister.games.save-max-bytes` = `512MB`
+- `app.ister.games.save-retention` = `10`
+- `app.ister.server.background-nice` = `10`
+- `app.ister.server.nice-path` = `/usr/bin/nice`
+- `app.ister.server.segment-detect.concurrency` = `1`
+- `spring.http.clients.imperative.factory` = `jdk`
+
+### Install
+
+```sh
+helm install ister oci://ghcr.io/ister-app/charts/ister --version 2.2.5
+```
+
+**Full changelog**: https://github.com/ister-app/chart/compare/v2.2.4...v2.2.5
+
 ## ister-chart v2.2.4
 
 | Component | Image | Version |
