@@ -706,7 +706,7 @@ rabbitmq:
   revisionHistoryLimit: null
   image:
     repository: rabbitmq
-    tag: "4.4.0-management-alpine"
+    tag: "4.4.1-management-alpine"
     digest: ""
     pullPolicy: IfNotPresent
   auth:
